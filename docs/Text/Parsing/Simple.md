@@ -27,8 +27,8 @@ MonadPlus Parser
 runParser :: forall a. Parser a -> String -> { consumed :: Maybe a, remaining :: String }
 ```
 
-Unwraps the newtype. giving you a function which takes a string and
-returns a product of already-parsed data and the remaining String.
+Unwraps the `newtype`, giving you a function which takes a `String` and
+returns a product of already-parsed data and the remaining `String`.
 
 #### `parse`
 
@@ -36,7 +36,7 @@ returns a product of already-parsed data and the remaining String.
 parse :: forall a. Parser a -> String -> Maybe a
 ```
 
-Run a given parser against a string, maybe getting a value or nothing.
+Run a given parser against a `String`, maybe getting a value or nothing.
 
 #### `choice`
 
