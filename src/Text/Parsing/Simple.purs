@@ -3,27 +3,23 @@ module Text.Parsing.Simple
   ( Parser()
   , runParser
   , parse
-  -- generalized combinators
-  , choice
-  , option
-  , bracket
-  , many
-  , many1
+  -- utility functions
   , fromCharList
-  -- Parser-specific combinators
+  -- polymorphic Parser-specific combinators
   , none
-  , item
-  , sepBy
-  , sat
   , try
   , fix
   , lookahead
+  , isn't
   , notFollowedBy
   , skip
-  , string
-  -- Specific Parsers
-  , digit
+  -- non-polymorphic Parsers
+  , item
+  , sat
+  , isn'tAny
   , char
+  , string
+  , digit
   , lower
   , upper
   , letter
@@ -48,14 +44,16 @@ import Control.Alt (class Alt, (<|>), alt)
 import Control.Plus (class Plus, empty)
 import Control.Alternative (class Alternative)
 import Control.MonadPlus (class MonadPlus)
-import Control.Apply ((*>), (<*))
+import Control.Apply ((*>))
 
 import Data.Monoid (class Monoid)
 import Data.Maybe (Maybe(..))
-import Data.Foldable (class Foldable, foldMap, foldl)
+import Data.Foldable (class Foldable, foldMap, notElem)
 import Data.String (uncons, fromChar)
-import Data.List (List(..), (:))
+import Data.List (List(), (:))
 import Data.Int (fromString)
+
+import Text.Parsing.Combinators (many)
 
 newtype Parser a = Parser (String -> { consumed :: Maybe a, remaining :: String })
 
@@ -82,7 +80,7 @@ instance altParser :: Alt Parser where
   alt (Parser x) (Parser y) =
     Parser \ str -> case (x str).consumed of
                          Just _ -> x str
-                         Nothing -> y str
+                         _ -> y str
 
 instance plusParser :: Plus Parser where
   empty = none
@@ -104,37 +102,13 @@ instance bindParser :: Bind Parser where
     let x = mx str
      in case x.consumed of
              Just y -> runParser (mf y) x.remaining
-             Nothing -> { consumed: Nothing, remaining: str }
+             _ -> { consumed: Nothing, remaining: str }
 
 instance monadParser :: Monad Parser
 
 instance alternativeParser :: Alternative Parser
 
 instance monadPlusParser :: MonadPlus Parser
-
--- | Choose the first successful element from a foldable container of parsers.
-choice :: forall f m a. (Plus m, Foldable f) => f (m a) -> m a
-choice = foldl alt empty
-
--- | Attempt a parse, with a default value in case of failure.
-option :: forall m a. Alternative m => a -> m a -> m a
-option x p = p <|> pure x
-
--- | Parse something surrounded by given arguments.
-bracket :: forall m l r a. Applicative m => m l -> m a -> m r -> m a
-bracket left target right = left *> target <* right
-
--- | Parse as many times as possible, giving a `List`.
-many :: forall m a. MonadPlus m => m a -> m (List a)
-many p = parsed <|> pure Nil where
-  parsed = do
-    x <- p
-    xs <- many p
-    pure (x : xs)
-
--- | Parse at least once, giving a `List`.
-many1 :: forall m a. MonadPlus m => m a -> m (List a)
-many1 p = Cons <$> p <*> many p
 
 fromCharList :: forall f. Foldable f => f Char -> String
 fromCharList = foldMap fromChar
@@ -143,30 +117,12 @@ fromCharList = foldMap fromChar
 none :: forall a. Parser a
 none = Parser \ str -> { consumed: Nothing, remaining: str }
 
--- | Parse a single `Char`.
-item :: Parser Char
-item = Parser \ str ->
-  case uncons str of
-       Just { head, tail } -> { consumed: Just head, remaining: tail }
-       Nothing -> { consumed: Nothing, remaining: str }
-
--- | Given a value to parse and a separating parser, put all the values it finds
--- | into a `List`.
-sepBy :: forall a b. Parser a -> Parser b -> Parser (List a)
-sepBy target separator = many $ target <* skip separator
-
--- | Create a parser from a characteristic function.
-sat :: (Char -> Boolean) -> Parser Char
-sat p = do
-  x <- item
-  if p x then pure x else empty
-
 -- | If the given parser fails, return to the point of failure.
 try :: forall a. Parser a -> Parser a
 try (Parser x) = Parser \ str ->
   case (x str).consumed of
        Just _ -> x str
-       Nothing -> { consumed: Nothing, remaining: str }
+       _ -> { consumed: Nothing, remaining: str }
 
 -- | Find a function's least fixed point.
 fix :: forall a. (Parser a -> Parser a) -> Parser a
@@ -178,17 +134,44 @@ lookahead (Parser x) = Parser \ str ->
   let parsed = x str
    in parsed { remaining = str }
 
-notFollowedBy :: forall a. Parser a -> Parser Unit
-notFollowedBy (Parser x) = Parser \ str ->
+-- | `isn't p` succeeds iff p fails, though it will always consume the same
+-- | amount of string that p does.
+isn't :: forall a. Parser a -> Parser Unit
+isn't (Parser x) = Parser \ str ->
   let parsed = x str
    in case parsed.consumed of
            Just _ -> parsed { consumed = Nothing }
            _ -> parsed { consumed = Just unit }
 
+-- | Differs from `isn't` in that this never consumes input.
+notFollowedBy :: forall a. Parser a -> Parser Unit
+notFollowedBy (Parser x) = Parser \ str ->
+  let parsed = x str
+   in case parsed.consumed of
+           Just _ -> { consumed: Nothing, remaining: str }
+           _ -> { consumed: Just unit, remaining: str }
+
 -- | Discard the result of a parse.
 skip :: forall a. Parser a -> Parser Unit
 skip (Parser p) =
   Parser \ str -> { consumed: Just unit, remaining: (p str).remaining }
+
+-- | Parse a single `Char`.
+item :: Parser Char
+item = Parser \ str ->
+  case uncons str of
+       Just { head, tail } -> { consumed: Just head, remaining: tail }
+       _ -> { consumed: Nothing, remaining: str }
+
+-- | Create a parser from a characteristic function.
+sat :: (Char -> Boolean) -> Parser Char
+sat p = do
+  x <- item
+  if p x then pure x else empty
+
+-- | Match any character not in the foldable container.
+isn'tAny :: forall f. Foldable f => f Char -> Parser Char
+isn'tAny xs = sat (`notElem` xs)
 
 char :: Char -> Parser Char
 char x = sat (== x)
@@ -257,7 +240,7 @@ int = do
   n <- numerals
   case fromString n of
        Just x -> pure x
-       Nothing -> empty
+       _ -> empty
 
 -- | Parse a `Number`. The string must have digits surrounding a decimal point.
 number :: Parser Number

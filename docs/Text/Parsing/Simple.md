@@ -38,46 +38,6 @@ parse :: forall a. Parser a -> String -> Maybe a
 
 Run a given parser against a `String`, maybe getting a value or nothing.
 
-#### `choice`
-
-``` purescript
-choice :: forall f m a. (Plus m, Foldable f) => f (m a) -> m a
-```
-
-Choose the first successful element from a foldable container of parsers.
-
-#### `option`
-
-``` purescript
-option :: forall m a. (Alternative m) => a -> m a -> m a
-```
-
-Attempt a parse, with a default value in case of failure.
-
-#### `bracket`
-
-``` purescript
-bracket :: forall m l r a. (Applicative m) => m l -> m a -> m r -> m a
-```
-
-Parse something surrounded by given arguments.
-
-#### `many`
-
-``` purescript
-many :: forall m a. (MonadPlus m) => m a -> m (List a)
-```
-
-Parse as many times as possible, giving a `List`.
-
-#### `many1`
-
-``` purescript
-many1 :: forall m a. (MonadPlus m) => m a -> m (List a)
-```
-
-Parse at least once, giving a `List`.
-
 #### `fromCharList`
 
 ``` purescript
@@ -91,31 +51,6 @@ none :: forall a. Parser a
 ```
 
 Always fail.
-
-#### `item`
-
-``` purescript
-item :: Parser Char
-```
-
-Parse a single `Char`.
-
-#### `sepBy`
-
-``` purescript
-sepBy :: forall a b. Parser a -> Parser b -> Parser (List a)
-```
-
-Given a value to parse and a separating parser, put all the values it finds
-into a `List`.
-
-#### `sat`
-
-``` purescript
-sat :: (Char -> Boolean) -> Parser Char
-```
-
-Create a parser from a characteristic function.
 
 #### `try`
 
@@ -141,11 +76,22 @@ lookahead :: forall a. Parser a -> Parser a
 
 Parse without consuming input.
 
+#### `isn't`
+
+``` purescript
+isn't :: forall a. Parser a -> Parser Unit
+```
+
+`isn't p` succeeds iff p fails, though it will always consume the same
+amount of string that p does.
+
 #### `notFollowedBy`
 
 ``` purescript
 notFollowedBy :: forall a. Parser a -> Parser Unit
 ```
+
+Differs from `isn't` in that this never consumes input.
 
 #### `skip`
 
@@ -154,6 +100,30 @@ skip :: forall a. Parser a -> Parser Unit
 ```
 
 Discard the result of a parse.
+
+#### `item`
+
+``` purescript
+item :: Parser Char
+```
+
+Parse a single `Char`.
+
+#### `sat`
+
+``` purescript
+sat :: (Char -> Boolean) -> Parser Char
+```
+
+Create a parser from a characteristic function.
+
+#### `isn'tAny`
+
+``` purescript
+isn'tAny :: forall f. (Foldable f) => f Char -> Parser Char
+```
+
+Match any character not in the foldable container.
 
 #### `char`
 

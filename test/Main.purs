@@ -2,6 +2,7 @@ module Test.Main where
 
 import Prelude
 import Text.Parsing.Simple
+import Text.Parsing.Combinators
 import Control.Monad.Eff.Console (print)
 
 type Year = Int
