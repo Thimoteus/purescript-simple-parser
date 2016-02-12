@@ -10,6 +10,7 @@ newtype Parser a
 ``` purescript
 Semigroup (Parser a)
 Monoid (Parser a)
+Lazy (Parser a)
 Functor Parser
 Alt Parser
 Plus Parser
@@ -59,6 +60,23 @@ try :: forall a. Parser a -> Parser a
 ```
 
 If the given parser fails, return to the point of failure.
+
+#### `many`
+
+``` purescript
+many :: forall a. Parser a -> Parser (List a)
+```
+
+Attempt a parse as many times as possible, putting all successes into
+a list.
+
+#### `many1`
+
+``` purescript
+many1 :: forall a. Parser a -> Parser (List a)
+```
+
+Attempt a parse one or more times.
 
 #### `fix`
 

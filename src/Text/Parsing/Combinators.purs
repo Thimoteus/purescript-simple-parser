@@ -37,15 +37,19 @@ bracket left target right = left *> target <* right
 
 -- | Parse as many times as possible, giving a `List`.
 many :: forall m a. MonadPlus m => m a -> m (List a)
-many p = parsed <|> pure Nil where
-  parsed = do
-    x <- p
-    xs <- many p
-    pure (x : xs)
+many p = many1 p <|> pure Nil
+--many p = parsed <|> pure Nil where
+  --parsed = do
+    --x <- p
+    --xs <- many p
+    --pure (x : xs)
 
 -- | Parse at least once, giving a `List`.
 many1 :: forall m a. MonadPlus m => m a -> m (List a)
-many1 p = Cons <$> p <*> many p
+many1 p = do
+  a <- p
+  as <- many p
+  pure (a : as)
 
 -- | `exactly n p` fails iff `many p` would produce a list of length < n.
 -- | However, `exactly n p` will never produce a list of *larger* length.

@@ -8,6 +8,8 @@ module Text.Parsing.Simple
   -- polymorphic Parser-specific combinators
   , none
   , try
+  , many
+  , many1
   , fix
   , lookahead
   , isn't
@@ -37,23 +39,21 @@ module Text.Parsing.Simple
   , boolean
   ) where
 
-import Prelude (class Applicative, class Monad, class Bind, class Apply, class Functor, class Semigroup, Unit, pure, bind, (++), ($), (<$>), (<=), (&&), (>=), (==), unit, (<*>), (<<<))
+import Prelude (class Applicative, class Monad, class Bind, class Apply, class Functor, class Semigroup, Unit, pure, bind, (<>), ($), (<$>), (<=), (&&), (>=), (==), unit, (<*>))
 import Global (readFloat)
 
 import Control.Alt (class Alt, (<|>), alt)
 import Control.Plus (class Plus, empty)
 import Control.Alternative (class Alternative)
 import Control.MonadPlus (class MonadPlus)
-import Control.Apply ((*>))
+import Control.Lazy (class Lazy)
 
 import Data.Monoid (class Monoid)
 import Data.Maybe (Maybe(..))
 import Data.Foldable (class Foldable, foldMap, notElem)
-import Data.String (uncons, fromChar)
-import Data.List (List(), (:))
+import Data.String (fromChar, indexOf, drop, length, charAt)
+import Data.List (List(..), (:), reverse)
 import Data.Int (fromString)
-
-import Text.Parsing.Combinators (many)
 
 newtype Parser a = Parser (String -> { consumed :: Maybe a, remaining :: String })
 
@@ -64,7 +64,7 @@ runParser (Parser x) = x
 
 -- | Run a given parser against a `String`, maybe getting a value or nothing.
 parse :: forall a. Parser a -> String -> Maybe a
-parse p = _.consumed <<< runParser p
+parse (Parser p) input = (p input).consumed
 
 instance semigroupParser :: Semigroup (Parser a) where
   append = alt
@@ -72,14 +72,19 @@ instance semigroupParser :: Semigroup (Parser a) where
 instance monoidParser :: Monoid (Parser a) where
   mempty = none
 
+instance lazyParser :: Lazy (Parser a) where
+  defer f = Parser \ str -> runParser (f unit) str
+
 instance functorParser :: Functor Parser where
   map f (Parser p) = Parser \ str ->
-    { consumed: f <$> (p str).consumed, remaining: (p str).remaining }
+    let x = p str
+     in { consumed: f <$> x.consumed, remaining: x.remaining }
 
 instance altParser :: Alt Parser where
   alt (Parser x) (Parser y) =
-    Parser \ str -> case (x str).consumed of
-                         Just _ -> x str
+    Parser \ str -> let z = x str
+                     in case z.consumed of
+                         Just _ -> z
                          _ -> y str
 
 instance plusParser :: Plus Parser where
@@ -120,9 +125,25 @@ none = Parser \ str -> { consumed: Nothing, remaining: str }
 -- | If the given parser fails, return to the point of failure.
 try :: forall a. Parser a -> Parser a
 try (Parser x) = Parser \ str ->
-  case (x str).consumed of
-       Just _ -> x str
+  let y = x str
+   in case y.consumed of
+       Just _ -> y
        _ -> { consumed: Nothing, remaining: str }
+
+-- | Attempt a parse as many times as possible, putting all successes into
+-- | a list.
+many :: forall a. Parser a -> Parser (List a)
+many p = Parser \ str -> go str p Nil
+  where
+    go curr f acc =
+      let y = runParser f curr
+       in case y.consumed of
+               Just z -> go y.remaining f (z : acc)
+               _ -> { consumed: Just (reverse acc), remaining: curr }
+
+-- | Attempt a parse one or more times.
+many1 :: forall a. Parser a -> Parser (List a)
+many1 p = Cons <$> p <*> many p
 
 -- | Find a function's least fixed point.
 fix :: forall a. (Parser a -> Parser a) -> Parser a
@@ -158,16 +179,15 @@ skip (Parser p) =
 
 -- | Parse a single `Char`.
 item :: Parser Char
-item = Parser \ str ->
-  case uncons str of
-       Just { head, tail } -> { consumed: Just head, remaining: tail }
-       _ -> { consumed: Nothing, remaining: str }
+item = Parser \ str -> { consumed: charAt 0 str, remaining: drop 1 str }
 
 -- | Create a parser from a characteristic function.
 sat :: (Char -> Boolean) -> Parser Char
-sat p = do
-  x <- item
-  if p x then pure x else empty
+sat f = Parser \ str ->
+        let mc = charAt 0 str
+         in case f <$> mc of
+                 Just true -> { consumed: mc, remaining: drop 1 str }
+                 _ -> { consumed: Nothing, remaining: str }
 
 -- | Match any character not in the foldable container.
 isn'tAny :: forall f. Foldable f => f Char -> Parser Char
@@ -177,11 +197,10 @@ char :: Char -> Parser Char
 char x = sat (== x)
 
 string :: String -> Parser String
-string "" = pure ""
-string x =
-  case uncons x of
-       Just y -> char y.head *> string y.tail *> pure (fromChar y.head ++ y.tail)
-       _ -> pure ""
+string s = Parser \ str ->
+           case indexOf s str of
+                Just 0 -> { consumed: Just s, remaining: drop (length s) str }
+                _ -> { consumed: Nothing, remaining: str }
 
 digit :: Parser Char
 digit = sat \ x -> x >= '0' && x <= '9'
@@ -248,7 +267,7 @@ number = do
   integral <- numerals
   char '.'
   fractional <- fromCharList <$> many digit
-  pure $ readFloat $ integral ++ "." ++ fractional
+  pure $ readFloat $ integral <> "." <> fractional
 
 boolean :: Parser Boolean
 boolean = do
