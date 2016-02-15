@@ -10,7 +10,7 @@ if you want fancy features, like error messages when your parsers fail.
 
 ```purescript
 import Text.Parsing.Simple
-import Text.Parsing.Combinators
+import Text.Parsing.Combinators as C
 
 data TupleInt = TupleInt Int Int
 
@@ -36,4 +36,6 @@ Also see the [test](test/) folder.
 
     bower i purescript-simple-parser
 
-- [Module Documentation](docs/)
+## Documentation
+- [On Github](docs/Text/Parsing/)
+- [On Pursuit](https://pursuit.purescript.org/packages/purescript-simple-parser/2.1.0)

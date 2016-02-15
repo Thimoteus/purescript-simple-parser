@@ -15,10 +15,15 @@ module Text.Parsing.Simple
   , isn't
   , notFollowedBy
   , skip
+  , suchThat
+  , (|=)
   -- non-polymorphic Parsers
   , item
   , sat
+  , isn'tAnyF
   , isn'tAny
+  , anyOfF
+  , anyOf
   , char
   , string
   , digit
@@ -33,13 +38,14 @@ module Text.Parsing.Simple
   , whitespace
   , whitespaces
   , skipSpaces
+  , word
   , eof
   , int
   , number
   , boolean
   ) where
 
-import Prelude (class Applicative, class Monad, class Bind, class Apply, class Functor, class Semigroup, Unit, pure, bind, (<>), ($), (<$>), (<=), (&&), (>=), (==), unit, (<*>))
+import Prelude (class Applicative, class Monad, class Bind, class Apply, class Functor, class Semigroup, Unit, pure, bind, (<>), ($), (<$>), (<=), (&&), (>=), (==), unit, (<*>), (/=))
 import Global (readFloat)
 
 import Control.Alt (class Alt, (<|>), alt)
@@ -50,8 +56,8 @@ import Control.Lazy (class Lazy)
 
 import Data.Monoid (class Monoid)
 import Data.Maybe (Maybe(..))
-import Data.Foldable (class Foldable, foldMap, notElem)
-import Data.String (fromChar, indexOf, drop, length, charAt)
+import Data.Foldable (class Foldable, foldMap, notElem, elem)
+import Data.String (fromChar, indexOf, drop, length, charAt, contains)
 import Data.List (List(..), (:), reverse)
 import Data.Int (fromString)
 
@@ -132,6 +138,8 @@ try (Parser x) = Parser \ str ->
 
 -- | Attempt a parse as many times as possible, putting all successes into
 -- | a list.
+-- | WARNING: Applying this to a parser which never fails and never consumes
+-- | input will result in a bottom, i.e. a nonterminating program.
 many :: forall a. Parser a -> Parser (List a)
 many p = Parser \ str -> go str p Nil
   where
@@ -177,11 +185,23 @@ skip :: forall a. Parser a -> Parser Unit
 skip (Parser p) =
   Parser \ str -> { consumed: Just unit, remaining: (p str).remaining }
 
+-- | Attempt a parse subject to a predicate. If the parse succeeds but the
+-- | predicate fails, the parse fails without backtracking.
+-- | If the parse fails, it will backtrack.
+suchThat :: forall a. Parser a -> (a -> Boolean) -> Parser a
+suchThat (Parser p) f = Parser \ str ->
+  let parsed = p str
+   in case parsed.consumed of
+           Just res -> if f res then parsed else parsed { consumed = Nothing }
+           _ -> { consumed: Nothing, remaining: str }
+
+infixl 5 suchThat as |=
+
 -- | Parse a single `Char`.
 item :: Parser Char
 item = Parser \ str -> { consumed: charAt 0 str, remaining: drop 1 str }
 
--- | Create a parser from a characteristic function.
+-- | Create a parser from a `Char`acteristic function.
 sat :: (Char -> Boolean) -> Parser Char
 sat f = Parser \ str ->
         let mc = charAt 0 str
@@ -190,8 +210,34 @@ sat f = Parser \ str ->
                  _ -> { consumed: Nothing, remaining: str }
 
 -- | Match any character not in the foldable container.
-isn'tAny :: forall f. Foldable f => f Char -> Parser Char
-isn'tAny xs = sat (`notElem` xs)
+isn'tAnyF :: forall f. Foldable f => f Char -> Parser Char
+isn'tAnyF xs = sat (`notElem` xs)
+
+-- | Match any character not in the string.
+-- | Equivalent to `isn'tAnyF <<< toCharArray`.
+isn'tAny :: String -> Parser Char
+isn'tAny s =
+  Parser \ str ->
+    case charAt 0 str of
+         Just c -> if contains (fromChar c) s
+                      then { consumed: Nothing, remaining: str }
+                      else { consumed: Just c, remaining: drop 1 str }
+         _ -> { consumed: Nothing, remaining: str }
+
+-- | Match any character in the foldable container.
+anyOfF :: forall f. Foldable f => f Char -> Parser Char
+anyOfF xs = sat (`elem` xs)
+
+-- | Match any character in the string.
+-- | Equivalent to `anyOfF <<< toCharArray`.
+anyOf :: String -> Parser Char
+anyOf s =
+  Parser \ str ->
+    case charAt 0 str of
+         Just c -> if contains (fromChar c) s
+                      then { consumed: Just c, remaining: drop 1 str }
+                      else { consumed: Nothing, remaining: str }
+         _ -> { consumed: Nothing, remaining: str }
 
 char :: Char -> Parser Char
 char x = sat (== x)
@@ -241,6 +287,11 @@ whitespaces = many whitespace
 
 skipSpaces :: Parser Unit
 skipSpaces = skip whitespaces
+
+-- | Contiguous strings with no tabs, spaces, carriage returns or newlines.
+word :: Parser String
+word = fromCharList <$> many (sat \ c ->
+  c /= ' ' && c /= '\t' && c /= '\r' && c /= '\n')
 
 -- | Parse the end of a file, returning `Unit` to indicate success.
 eof :: Parser Unit

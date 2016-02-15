@@ -69,6 +69,8 @@ many :: forall a. Parser a -> Parser (List a)
 
 Attempt a parse as many times as possible, putting all successes into
 a list.
+WARNING: Applying this to a parser which never fails and never consumes
+input will result in a bottom, i.e. a nonterminating program.
 
 #### `many1`
 
@@ -119,6 +121,24 @@ skip :: forall a. Parser a -> Parser Unit
 
 Discard the result of a parse.
 
+#### `suchThat`
+
+``` purescript
+suchThat :: forall a. Parser a -> (a -> Boolean) -> Parser a
+```
+
+Attempt a parse subject to a predicate. If the parse succeeds but the
+predicate fails, the parse fails without backtracking.
+If the parse fails, it will backtrack.
+
+#### `(|=)`
+
+``` purescript
+infixl 5 suchThat as |=
+```
+
+_left-associative / precedence 5_
+
 #### `item`
 
 ``` purescript
@@ -133,15 +153,41 @@ Parse a single `Char`.
 sat :: (Char -> Boolean) -> Parser Char
 ```
 
-Create a parser from a characteristic function.
+Create a parser from a `Char`acteristic function.
+
+#### `isn'tAnyF`
+
+``` purescript
+isn'tAnyF :: forall f. (Foldable f) => f Char -> Parser Char
+```
+
+Match any character not in the foldable container.
 
 #### `isn'tAny`
 
 ``` purescript
-isn'tAny :: forall f. (Foldable f) => f Char -> Parser Char
+isn'tAny :: String -> Parser Char
 ```
 
-Match any character not in the foldable container.
+Match any character not in the string.
+Equivalent to `isn'tAnyF <<< toCharArray`.
+
+#### `anyOfF`
+
+``` purescript
+anyOfF :: forall f. (Foldable f) => f Char -> Parser Char
+```
+
+Match any character in the foldable container.
+
+#### `anyOf`
+
+``` purescript
+anyOf :: String -> Parser Char
+```
+
+Match any character in the string.
+Equivalent to `anyOfF <<< toCharArray`.
 
 #### `char`
 
@@ -234,6 +280,14 @@ whitespaces :: Parser (List Char)
 ``` purescript
 skipSpaces :: Parser Unit
 ```
+
+#### `word`
+
+``` purescript
+word :: Parser String
+```
+
+Contiguous strings with no tabs, spaces, carriage returns or newlines.
 
 #### `eof`
 
