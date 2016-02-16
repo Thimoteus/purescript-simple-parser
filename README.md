@@ -2,10 +2,6 @@
 
 A simple parsing library.
 
-You may prefer [purescript-string-parsers](https://github.com/paf31/purescript-string-parsers)
-or [purescript-parsing](https://github.com/purescript-contrib/purescript-parsing)
-if you want fancy features, like error messages when your parsers fail.
-
 ## Usage
 
 ```purescript
@@ -38,4 +34,4 @@ Also see the [test](test/) folder.
 
 ## Documentation
 - [On Github](docs/Text/Parsing/)
-- [On Pursuit](https://pursuit.purescript.org/packages/purescript-simple-parser/2.1.0)
+- [On Pursuit](https://pursuit.purescript.org/packages/purescript-simple-parser/)
