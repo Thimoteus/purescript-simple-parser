@@ -1,54 +1,39 @@
 module Text.Parsing.Simple
   -- definitional exports
-  ( Parser()
-  , runParser
-  , parse
+  ( Parser(), runParser, parse
   -- utility functions
+  , altL, (<|<)
+  , altR, (>|>)
   , fromCharList
   -- polymorphic Parser-specific combinators
   , none
   , try
   , many
-  , many1
+  , some
   , fix
   , lookahead
   , isn't
   , notFollowedBy
   , skip
-  , suchThat
-  , (|=)
+  , suchThat, (|=)
   -- non-polymorphic Parsers
   , item
   , sat
-  , isn'tAnyF
-  , isn'tAny
-  , anyOfF
-  , anyOf
-  , char
-  , string
-  , digit
-  , lower
-  , upper
-  , letter
-  , alphanum
-  , space
-  , tab
-  , newline
-  , cr
-  , whitespace
-  , whitespaces
-  , skipSpaces
+  , isn'tAnyF, isn'tAny
+  , anyOfF, anyOf
+  , char, string
+  , digit, lower, upper, letter, alphanum
+  , space, tab, newline, cr
+  , whitespace, whitespaces, skipSpaces
   , word
   , eof
-  , int
-  , number
-  , boolean
+  , int, number, boolean
   ) where
 
 import Prelude (class Applicative, class Monad, class Bind, class Apply, class Functor, class Semigroup, Unit, pure, bind, (<>), ($), (<$>), (<=), (&&), (>=), (==), unit, (<*>), (/=))
 import Global (readFloat)
 
-import Control.Alt (class Alt, (<|>), alt)
+import Control.Alt (class Alt, (<|>))
 import Control.Plus (class Plus, empty)
 import Control.Alternative (class Alternative)
 import Control.MonadPlus (class MonadPlus)
@@ -61,7 +46,9 @@ import Data.String (fromChar, indexOf, drop, length, charAt, contains)
 import Data.List (List(..), (:), reverse)
 import Data.Int (fromString)
 
-newtype Parser a = Parser (String -> { consumed :: Maybe a, remaining :: String })
+type ParserT s a = s -> { consumed :: Maybe a, remaining :: s }
+
+newtype Parser a = Parser (ParserT String a)
 
 -- | Unwraps the `newtype`, giving you a function which takes a `String` and
 -- | returns a product of already-parsed data and the remaining `String`.
@@ -73,7 +60,7 @@ parse :: forall a. Parser a -> String -> Maybe a
 parse (Parser p) input = (p input).consumed
 
 instance semigroupParser :: Semigroup (Parser a) where
-  append = alt
+  append = altL
 
 instance monoidParser :: Monoid (Parser a) where
   mempty = none
@@ -87,11 +74,7 @@ instance functorParser :: Functor Parser where
      in { consumed: f <$> x.consumed, remaining: x.remaining }
 
 instance altParser :: Alt Parser where
-  alt (Parser x) (Parser y) =
-    Parser \ str -> let z = x str
-                     in case z.consumed of
-                         Just _ -> z
-                         _ -> y str
+  alt = altL
 
 instance plusParser :: Plus Parser where
   empty = none
@@ -120,6 +103,24 @@ instance monadParser :: Monad Parser
 instance alternativeParser :: Alternative Parser
 
 instance monadPlusParser :: MonadPlus Parser
+
+altL :: forall a. Parser a -> Parser a -> Parser a
+altL (Parser x) (Parser y) =
+  Parser \ str -> let z = x str
+                   in case z.consumed of
+                       Just _ -> z
+                       _ -> y str
+
+infixl 3 altL as <|<
+
+altR :: forall a. Parser a -> Parser a -> Parser a
+altR (Parser x) (Parser y) =
+  Parser \ str -> let z = y str
+                   in case z.consumed of
+                       Just _ -> z
+                       _ -> x str
+
+infixr 3 altR as >|>
 
 fromCharList :: forall f. Foldable f => f Char -> String
 fromCharList = foldMap fromChar
@@ -150,8 +151,8 @@ many p = Parser \ str -> go str p Nil
                _ -> { consumed: Just (reverse acc), remaining: curr }
 
 -- | Attempt a parse one or more times.
-many1 :: forall a. Parser a -> Parser (List a)
-many1 p = Cons <$> p <*> many p
+some :: forall a. Parser a -> Parser (List a)
+some p = Cons <$> p <*> many p
 
 -- | Find a function's least fixed point.
 fix :: forall a. (Parser a -> Parser a) -> Parser a
