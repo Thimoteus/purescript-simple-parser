@@ -9,7 +9,7 @@ module Text.Parsing.Simple
   , none
   , try
   , many
-  , many1
+  , some
   , fix
   , lookahead
   , isn't
@@ -45,7 +45,7 @@ module Text.Parsing.Simple
   , boolean
   ) where
 
-import Prelude (class Applicative, class Monad, class Bind, class Apply, class Functor, class Semigroup, Unit, pure, bind, (<>), ($), (<$>), (<=), (&&), (>=), (==), unit, (<*>), (/=))
+import Prelude (class Applicative, class Monad, class Bind, class Apply, class Functor, class Semigroup, Unit, pure, bind, (<>), ($), (<$>), (<=), (&&), (>=), (==), unit, (<*>), (/=), show)
 import Global (readFloat)
 
 import Control.Alt (class Alt, (<|>), alt)
@@ -55,21 +55,23 @@ import Control.MonadPlus (class MonadPlus)
 import Control.Lazy (class Lazy)
 
 import Data.Monoid (class Monoid)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(Just))
+import Data.Either (Either(..))
 import Data.Foldable (class Foldable, foldMap, notElem, elem)
-import Data.String (fromChar, indexOf, drop, length, charAt, contains)
+import Data.String (fromChar, indexOf, drop, length, charAt, contains, take)
 import Data.List (List(..), (:), reverse)
 import Data.Int (fromString)
 
-newtype Parser a = Parser (String -> { consumed :: Maybe a, remaining :: String })
+type ParseError = String
+newtype Parser a = Parser (String -> { consumed :: Either ParseError a, remaining :: String })
 
 -- | Unwraps the `newtype`, giving you a function which takes a `String` and
 -- | returns a product of already-parsed data and the remaining `String`.
-runParser :: forall a. Parser a -> String -> { consumed :: Maybe a, remaining :: String }
+runParser :: forall a. Parser a -> String -> { consumed :: Either ParseError a, remaining :: String }
 runParser (Parser x) = x
 
 -- | Run a given parser against a `String`, maybe getting a value or nothing.
-parse :: forall a. Parser a -> String -> Maybe a
+parse :: forall a. Parser a -> String -> Either ParseError a
 parse (Parser p) input = (p input).consumed
 
 instance semigroupParser :: Semigroup (Parser a) where
@@ -84,13 +86,13 @@ instance lazyParser :: Lazy (Parser a) where
 instance functorParser :: Functor Parser where
   map f (Parser p) = Parser \ str ->
     let x = p str
-     in { consumed: f <$> x.consumed, remaining: x.remaining }
+     in x { consumed = f <$> x.consumed }
 
 instance altParser :: Alt Parser where
   alt (Parser x) (Parser y) =
     Parser \ str -> let z = x str
                      in case z.consumed of
-                         Just _ -> z
+                         Right _ -> z
                          _ -> y str
 
 instance plusParser :: Plus Parser where
@@ -106,14 +108,14 @@ instance applyParser :: Apply Parser where
        in { consumed, remaining }
 
 instance applicativeParser :: Applicative Parser where
-  pure x = Parser \ str -> { consumed: Just x, remaining: str }
+  pure x = Parser \ str -> { consumed: Right x, remaining: str }
 
 instance bindParser :: Bind Parser where
   bind (Parser mx) mf = Parser \ str ->
     let x = mx str
      in case x.consumed of
-             Just y -> runParser (mf y) x.remaining
-             _ -> { consumed: Nothing, remaining: str }
+             Right y -> runParser (mf y) x.remaining
+             _ -> { consumed: Left ("Parse failed at " <> take 10 str <> "..."), remaining: str }
 
 instance monadParser :: Monad Parser
 
@@ -126,15 +128,28 @@ fromCharList = foldMap fromChar
 
 -- | Always fail.
 none :: forall a. Parser a
-none = Parser \ str -> { consumed: Nothing, remaining: str }
+none = Parser \ str -> { consumed: Left "Parse `none` called", remaining: str }
 
--- | If the given parser fails, return to the point of failure.
+-- | Fail with a message
+fail :: forall a. ParseError -> Parser a
+fail msg = Parser \ str -> { consumed: Left msg, remaining: str }
+
+orFailWith :: forall a. Parser a -> ParseError -> Parser a
+orFailWith (Parser p) msg = Parser \ str ->
+                            let parsed = p str
+                             in case parsed.consumed of
+                                     Right _ -> parsed
+                                     _ -> { consumed: Left msg, remaining: str }
+
+infix 0 orFailWith as <?>
+
+-- | If the given parser fails, backtrack to the point of failure.
 try :: forall a. Parser a -> Parser a
 try (Parser x) = Parser \ str ->
   let y = x str
    in case y.consumed of
-       Just _ -> y
-       _ -> { consumed: Nothing, remaining: str }
+       Right _ -> y
+       _ -> { consumed: Left "Parse failed on `try`, backtracking", remaining: str }
 
 -- | Attempt a parse as many times as possible, putting all successes into
 -- | a list.
@@ -146,12 +161,12 @@ many p = Parser \ str -> go str p Nil
     go curr f acc =
       let y = runParser f curr
        in case y.consumed of
-               Just z -> go y.remaining f (z : acc)
-               _ -> { consumed: Just (reverse acc), remaining: curr }
+               Right z -> go y.remaining f (z : acc)
+               _ -> { consumed: Right (reverse acc), remaining: curr }
 
 -- | Attempt a parse one or more times.
-many1 :: forall a. Parser a -> Parser (List a)
-many1 p = Cons <$> p <*> many p
+some :: forall a. Parser a -> Parser (List a)
+some p = Cons <$> p <*> many p
 
 -- | Find a function's least fixed point.
 fix :: forall a. (Parser a -> Parser a) -> Parser a
@@ -169,45 +184,51 @@ isn't :: forall a. Parser a -> Parser Unit
 isn't (Parser x) = Parser \ str ->
   let parsed = x str
    in case parsed.consumed of
-           Just _ -> parsed { consumed = Nothing }
-           _ -> parsed { consumed = Just unit }
+           Right _ -> parsed { consumed = Left "Parse failed on `isn't`" }
+           _ -> parsed { consumed = Right unit }
 
 -- | Differs from `isn't` in that this never consumes input.
 notFollowedBy :: forall a. Parser a -> Parser Unit
 notFollowedBy (Parser x) = Parser \ str ->
   let parsed = x str
    in case parsed.consumed of
-           Just _ -> { consumed: Nothing, remaining: str }
-           _ -> { consumed: Just unit, remaining: str }
+           Right _ -> { consumed: Left "Parse failed on `notFollowedBy`", remaining: str }
+           _ -> { consumed: Right unit, remaining: str }
 
 -- | Discard the result of a parse.
 skip :: forall a. Parser a -> Parser Unit
 skip (Parser p) =
-  Parser \ str -> { consumed: Just unit, remaining: (p str).remaining }
+  Parser \ str -> { consumed: Right unit, remaining: (p str).remaining }
 
 -- | Attempt a parse subject to a predicate. If the parse succeeds but the
--- | predicate fails, the parse fails without backtracking.
+-- | predicate does not hold, the resulting parse fails *without* backtracking.
 -- | If the parse fails, it will backtrack.
 suchThat :: forall a. Parser a -> (a -> Boolean) -> Parser a
 suchThat (Parser p) f = Parser \ str ->
   let parsed = p str
    in case parsed.consumed of
-           Just res -> if f res then parsed else parsed { consumed = Nothing }
-           _ -> { consumed: Nothing, remaining: str }
+           Right res -> if f res then parsed else parsed { consumed = Left "Predicate failed on `suchThat`" }
+           _ -> { consumed: Left "Parse failed on `suchThat`", remaining: str }
 
 infixl 5 suchThat as |=
 
 -- | Parse a single `Char`.
 item :: Parser Char
-item = Parser \ str -> { consumed: charAt 0 str, remaining: drop 1 str }
+item = Parser \ str ->
+       case charAt 0 str of
+            Just c -> { consumed: Right c, remaining: drop 1 str }
+            _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Create a parser from a `Char`acteristic function.
 sat :: (Char -> Boolean) -> Parser Char
 sat f = Parser \ str ->
-        let mc = charAt 0 str
-         in case f <$> mc of
-                 Just true -> { consumed: mc, remaining: drop 1 str }
-                 _ -> { consumed: Nothing, remaining: str }
+        case charAt 0 str of
+             Just c ->
+               if f c
+                  then { consumed: Right c, remaining: drop 1 str }
+                  else { consumed: Left ("Character " <> show c <> " did not satisfy predicate")
+                       , remaining: drop 1 str }
+             _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Match any character not in the foldable container.
 isn'tAnyF :: forall f. Foldable f => f Char -> Parser Char
@@ -220,9 +241,9 @@ isn'tAny s =
   Parser \ str ->
     case charAt 0 str of
          Just c -> if contains (fromChar c) s
-                      then { consumed: Nothing, remaining: str }
-                      else { consumed: Just c, remaining: drop 1 str }
-         _ -> { consumed: Nothing, remaining: str }
+                      then { consumed: Left ("Expecting none of " <> show s <> " but found " <> show c), remaining: str }
+                      else { consumed: Right c, remaining: drop 1 str }
+         _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Match any character in the foldable container.
 anyOfF :: forall f. Foldable f => f Char -> Parser Char
@@ -235,52 +256,57 @@ anyOf s =
   Parser \ str ->
     case charAt 0 str of
          Just c -> if contains (fromChar c) s
-                      then { consumed: Just c, remaining: drop 1 str }
-                      else { consumed: Nothing, remaining: str }
-         _ -> { consumed: Nothing, remaining: str }
+                      then { consumed: Right c, remaining: drop 1 str }
+                      else { consumed: Left ("Expecting one of " <> show s <> " but found " <> show c), remaining: str }
+         _ -> { consumed: Left "Reached end of file", remaining: str }
 
 char :: Char -> Parser Char
-char x = sat (== x)
+char x = Parser \ str ->
+         case charAt 0 str of
+              Just c -> if c == x
+                           then { consumed: Right c, remaining: drop 1 str }
+                           else { consumed: Left ("Expecting " <> show x <> " but found " <> show c), remaining: str }
+              _ -> { consumed: Left "Reached end of file", remaining: str }
 
 string :: String -> Parser String
 string s = Parser \ str ->
            case indexOf s str of
-                Just 0 -> { consumed: Just s, remaining: drop (length s) str }
-                _ -> { consumed: Nothing, remaining: str }
+                Just 0 -> { consumed: Right s, remaining: drop (length s) str }
+                _ -> { consumed: Left ("Expecting " <> show s <> " but found " <> show (take (length s) str)), remaining: str }
 
 digit :: Parser Char
-digit = sat \ x -> x >= '0' && x <= '9'
+digit = (sat \ x -> x >= '0' && x <= '9') <?> "Expected a digit"
 
 -- | Parse a lowercase character.
 lower :: Parser Char
-lower = sat \ x -> x >= 'a' && x <= 'z'
+lower = (sat \ x -> x >= 'a' && x <= 'z') <?> "Expected a lower-case character"
 
 -- | Parse an uppercase character.
 upper :: Parser Char
-upper = sat \ x -> x >= 'A' && x <= 'Z'
+upper = (sat \ x -> x >= 'A' && x <= 'Z') <?> "Expected an upper-case character"
 
 letter :: Parser Char
-letter = lower <|> upper
+letter = lower <|> upper <?> "Expected a letter"
 
 -- | Parse a letter or a digit.
 alphanum :: Parser Char
-alphanum = letter <|> digit
+alphanum = letter <|> digit <?> "Expected a letter or a digit"
 
 space :: Parser Char
-space = char ' '
+space = char ' ' <?> "Expected a space"
 
 tab :: Parser Char
-tab = char '\t'
+tab = char '\t' <?> "Expected a tab"
 
 newline :: Parser Char
-newline = char '\n'
+newline = char '\n' <?> "Expected a newline"
 
 -- | Parse a carriage return.
 cr :: Parser Char
-cr = char '\r'
+cr = char '\r' <?> "Expected a carriage return"
 
 whitespace :: Parser Char
-whitespace = space <|> tab <|> newline <|> cr
+whitespace = space <|> tab <|> newline <|> cr <?> "Expected whitespace"
 
 whitespaces :: Parser (List Char)
 whitespaces = many whitespace
@@ -295,7 +321,7 @@ word = fromCharList <$> many (sat \ c ->
 
 -- | Parse the end of a file, returning `Unit` to indicate success.
 eof :: Parser Unit
-eof = notFollowedBy item
+eof = notFollowedBy item <?> "Expected empty string"
 
 numerals :: Parser String
 numerals = do
