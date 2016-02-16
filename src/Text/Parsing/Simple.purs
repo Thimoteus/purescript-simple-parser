@@ -115,7 +115,9 @@ instance bindParser :: Bind Parser where
     let x = mx str
      in case x.consumed of
              Right y -> runParser (mf y) x.remaining
-             _ -> { consumed: Left ("Parse failed at " <> take 10 str <> "..."), remaining: str }
+             _ ->
+               let msg = "Parse failed at " <> take 10 str <> "..."
+                in { consumed: Left msg, remaining: str }
 
 instance monadParser :: Monad Parser
 
@@ -136,10 +138,10 @@ fail msg = Parser \ str -> { consumed: Left msg, remaining: str }
 
 orFailWith :: forall a. Parser a -> ParseError -> Parser a
 orFailWith (Parser p) msg = Parser \ str ->
-                            let parsed = p str
-                             in case parsed.consumed of
-                                     Right _ -> parsed
-                                     _ -> { consumed: Left msg, remaining: str }
+  let parsed = p str
+   in case parsed.consumed of
+           Right _ -> parsed
+           _ -> { consumed: Left msg, remaining: str }
 
 infix 0 orFailWith as <?>
 
@@ -149,7 +151,9 @@ try (Parser x) = Parser \ str ->
   let y = x str
    in case y.consumed of
        Right _ -> y
-       _ -> { consumed: Left "Parse failed on `try`, backtracking", remaining: str }
+       _ ->
+        let msg = "Parse failed on `try`"
+         in { consumed: Left msg, remaining: str }
 
 -- | Attempt a parse as many times as possible, putting all successes into
 -- | a list.
@@ -192,7 +196,8 @@ notFollowedBy :: forall a. Parser a -> Parser Unit
 notFollowedBy (Parser x) = Parser \ str ->
   let parsed = x str
    in case parsed.consumed of
-           Right _ -> { consumed: Left "Parse failed on `notFollowedBy`", remaining: str }
+           Right _ -> let msg = "Parse failed on `notFollowedBy`"
+                       in { consumed: Left msg, remaining: str }
            _ -> { consumed: Right unit, remaining: str }
 
 -- | Discard the result of a parse.
@@ -207,7 +212,10 @@ suchThat :: forall a. Parser a -> (a -> Boolean) -> Parser a
 suchThat (Parser p) f = Parser \ str ->
   let parsed = p str
    in case parsed.consumed of
-           Right res -> if f res then parsed else parsed { consumed = Left "Predicate failed on `suchThat`" }
+           Right res -> if f res
+                           then parsed
+                           else let msg = "Predicate failed on `suchThat`"
+                                 in parsed { consumed = Left msg }
            _ -> { consumed: Left "Parse failed on `suchThat`", remaining: str }
 
 infixl 5 suchThat as |=
@@ -215,20 +223,22 @@ infixl 5 suchThat as |=
 -- | Parse a single `Char`.
 item :: Parser Char
 item = Parser \ str ->
-       case charAt 0 str of
-            Just c -> { consumed: Right c, remaining: drop 1 str }
-            _ -> { consumed: Left "Reached end of file", remaining: str }
+  case charAt 0 str of
+       Just c -> { consumed: Right c, remaining: drop 1 str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Create a parser from a `Char`acteristic function.
 sat :: (Char -> Boolean) -> Parser Char
 sat f = Parser \ str ->
-        case charAt 0 str of
-             Just c ->
-               if f c
-                  then { consumed: Right c, remaining: drop 1 str }
-                  else { consumed: Left ("Character " <> show c <> " did not satisfy predicate")
-                       , remaining: drop 1 str }
-             _ -> { consumed: Left "Reached end of file", remaining: str }
+  case charAt 0 str of
+       Just c ->
+         if f c
+            then { consumed: Right c, remaining: drop 1 str }
+            else let msg = "Character "
+                        <> show c
+                        <> " did not satisfy predicate"
+                  in { consumed: Left msg, remaining: drop 1 str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Match any character not in the foldable container.
 isn'tAnyF :: forall f. Foldable f => f Char -> Parser Char
@@ -237,13 +247,16 @@ isn'tAnyF xs = sat (`notElem` xs)
 -- | Match any character not in the string.
 -- | Equivalent to `isn'tAnyF <<< toCharArray`.
 isn'tAny :: String -> Parser Char
-isn'tAny s =
-  Parser \ str ->
-    case charAt 0 str of
-         Just c -> if contains (fromChar c) s
-                      then { consumed: Left ("Expecting none of " <> show s <> " but found " <> show c), remaining: str }
-                      else { consumed: Right c, remaining: drop 1 str }
-         _ -> { consumed: Left "Reached end of file", remaining: str }
+isn'tAny s = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if contains (fromChar c) s
+                    then let msg = "Expecting none of "
+                                <> show s
+                                <> " but found "
+                                <> show c
+                          in { consumed: Left msg, remaining: str }
+                    else { consumed: Right c, remaining: drop 1 str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Match any character in the foldable container.
 anyOfF :: forall f. Foldable f => f Char -> Parser Char
@@ -252,27 +265,38 @@ anyOfF xs = sat (`elem` xs)
 -- | Match any character in the string.
 -- | Equivalent to `anyOfF <<< toCharArray`.
 anyOf :: String -> Parser Char
-anyOf s =
-  Parser \ str ->
-    case charAt 0 str of
-         Just c -> if contains (fromChar c) s
-                      then { consumed: Right c, remaining: drop 1 str }
-                      else { consumed: Left ("Expecting one of " <> show s <> " but found " <> show c), remaining: str }
-         _ -> { consumed: Left "Reached end of file", remaining: str }
+anyOf s = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if contains (fromChar c) s
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expecting one of "
+                                <> show s
+                                <> " but found "
+                                <> show c
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 char :: Char -> Parser Char
 char x = Parser \ str ->
-         case charAt 0 str of
-              Just c -> if c == x
-                           then { consumed: Right c, remaining: drop 1 str }
-                           else { consumed: Left ("Expecting " <> show x <> " but found " <> show c), remaining: str }
-              _ -> { consumed: Left "Reached end of file", remaining: str }
+  case charAt 0 str of
+       Just c -> if c == x
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expecting "
+                                <> show x
+                                <> " but found "
+                                <> show c
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 string :: String -> Parser String
 string s = Parser \ str ->
-           case indexOf s str of
-                Just 0 -> { consumed: Right s, remaining: drop (length s) str }
-                _ -> { consumed: Left ("Expecting " <> show s <> " but found " <> show (take (length s) str)), remaining: str }
+  case indexOf s str of
+       Just 0 -> { consumed: Right s, remaining: drop (length s) str }
+       _ -> let msg = "Expecting "
+                   <> show s
+                   <> " but found "
+                   <> show (take (length s) str)
+             in { consumed: Left msg, remaining: str }
 
 digit :: Parser Char
 digit = (sat \ x -> x >= '0' && x <= '9') <?> "Expected a digit"
