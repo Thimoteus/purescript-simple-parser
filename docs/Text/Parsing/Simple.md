@@ -25,7 +25,7 @@ MonadPlus Parser
 #### `runParser`
 
 ``` purescript
-runParser :: forall a. Parser a -> String -> { consumed :: Maybe a, remaining :: String }
+runParser :: forall a. Parser a -> String -> { consumed :: Either ParseError a, remaining :: String }
 ```
 
 Unwraps the `newtype`, giving you a function which takes a `String` and
@@ -34,10 +34,38 @@ returns a product of already-parsed data and the remaining `String`.
 #### `parse`
 
 ``` purescript
-parse :: forall a. Parser a -> String -> Maybe a
+parse :: forall a. Parser a -> String -> Either ParseError a
 ```
 
-Run a given parser against a `String`, maybe getting a value or nothing.
+Run a parser against a `String`, either getting an error or a value.
+
+#### `altL`
+
+``` purescript
+altL :: forall a. Parser a -> Parser a -> Parser a
+```
+
+#### `(<|<)`
+
+``` purescript
+infixl 3 altL as <|<
+```
+
+_left-associative / precedence 3_
+
+#### `altR`
+
+``` purescript
+altR :: forall a. Parser a -> Parser a -> Parser a
+```
+
+#### `(>|>)`
+
+``` purescript
+infixr 3 altR as >|>
+```
+
+_right-associative / precedence 3_
 
 #### `fromCharList`
 
@@ -53,13 +81,35 @@ none :: forall a. Parser a
 
 Always fail.
 
+#### `fail`
+
+``` purescript
+fail :: forall a. ParseError -> Parser a
+```
+
+Fail with a message
+
+#### `orFailWith`
+
+``` purescript
+orFailWith :: forall a. Parser a -> ParseError -> Parser a
+```
+
+#### `(<?>)`
+
+``` purescript
+infix 0 orFailWith as <?>
+```
+
+_non-associative / precedence 0_
+
 #### `try`
 
 ``` purescript
 try :: forall a. Parser a -> Parser a
 ```
 
-If the given parser fails, return to the point of failure.
+If the given parser fails, backtrack to the point of failure.
 
 #### `many`
 
@@ -72,10 +122,10 @@ a list.
 WARNING: Applying this to a parser which never fails and never consumes
 input will result in a bottom, i.e. a nonterminating program.
 
-#### `many1`
+#### `some`
 
 ``` purescript
-many1 :: forall a. Parser a -> Parser (List a)
+some :: forall a. Parser a -> Parser (List a)
 ```
 
 Attempt a parse one or more times.
@@ -128,7 +178,7 @@ suchThat :: forall a. Parser a -> (a -> Boolean) -> Parser a
 ```
 
 Attempt a parse subject to a predicate. If the parse succeeds but the
-predicate fails, the parse fails without backtracking.
+predicate does not hold, the resulting parse fails *without* backtracking.
 If the parse fails, it will backtrack.
 
 #### `(|=)`

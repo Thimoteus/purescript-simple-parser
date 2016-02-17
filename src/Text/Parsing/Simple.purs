@@ -7,6 +7,7 @@ module Text.Parsing.Simple
   , fromCharList
   -- polymorphic Parser-specific combinators
   , none
+  , fail, orFailWith, (<?>)
   , try
   , many
   , some
@@ -30,11 +31,11 @@ module Text.Parsing.Simple
   , int, number, boolean
   ) where
 
-import Prelude (class Applicative, class Monad, class Bind, class Apply, class Functor, class Semigroup, Unit, pure, bind, (<>), ($), (<$>), (<=), (&&), (>=), (==), unit, (<*>), (/=), show)
+import Prelude (class Applicative, class Monad, class Bind, class Apply, class Functor, class Semigroup, Unit, pure, bind, (<>), ($), (<$>), (<=), (&&), (>=), (==), (||), unit, (<*>), (/=), show)
 import Global (readFloat)
 
 import Control.Alt (class Alt, (<|>))
-import Control.Plus (class Plus, empty)
+import Control.Plus (class Plus)
 import Control.Alternative (class Alternative)
 import Control.MonadPlus (class MonadPlus)
 import Control.Lazy (class Lazy)
@@ -57,7 +58,7 @@ newtype Parser a = Parser (String -> { consumed :: Either ParseError a
 runParser :: forall a. Parser a -> String -> { consumed :: Either ParseError a, remaining :: String }
 runParser (Parser x) = x
 
--- | Run a given parser against a `String`, maybe getting a value or nothing.
+-- | Run a parser against a `String`, either getting an error or a value.
 parse :: forall a. Parser a -> String -> Either ParseError a
 parse (Parser p) input = (p input).consumed
 
@@ -112,7 +113,7 @@ altL :: forall a. Parser a -> Parser a -> Parser a
 altL (Parser x) (Parser y) =
   Parser \ str -> let z = x str
                    in case z.consumed of
-                       Just _ -> z
+                       Right _ -> z
                        _ -> y str
 
 infixl 3 altL as <|<
@@ -121,7 +122,7 @@ altR :: forall a. Parser a -> Parser a -> Parser a
 altR (Parser x) (Parser y) =
   Parser \ str -> let z = y str
                    in case z.consumed of
-                       Just _ -> z
+                       Right _ -> z
                        _ -> x str
 
 infixr 3 altR as >|>
@@ -189,7 +190,11 @@ isn't :: forall a. Parser a -> Parser Unit
 isn't (Parser x) = Parser \ str ->
   let parsed = x str
    in case parsed.consumed of
-           Right _ -> parsed { consumed = Left "Parse failed on `isn't`" }
+           Right _ ->
+             let msg = "Parse failed on `isn't` when trying to parse the string "
+                    <> show (take 5 str)
+                    <> "..."
+              in parsed { consumed = Left msg }
            _ -> parsed { consumed = Right unit }
 
 -- | Differs from `isn't` in that this never consumes input.
@@ -197,8 +202,11 @@ notFollowedBy :: forall a. Parser a -> Parser Unit
 notFollowedBy (Parser x) = Parser \ str ->
   let parsed = x str
    in case parsed.consumed of
-           Right _ -> let msg = "Parse failed on `notFollowedBy`"
-                       in { consumed: Left msg, remaining: str }
+           Right _ ->
+             let msg = "Parse failed on `notFollowedBy` when trying to parse the string "
+                    <> show (take 5 str)
+                    <> "..."
+              in { consumed: Left msg, remaining: str }
            _ -> { consumed: Right unit, remaining: str }
 
 -- | Discard the result of a parse.
@@ -213,10 +221,13 @@ suchThat :: forall a. Parser a -> (a -> Boolean) -> Parser a
 suchThat (Parser p) f = Parser \ str ->
   let parsed = p str
    in case parsed.consumed of
-           Right res -> if f res
-                           then parsed
-                           else let msg = "Predicate failed on `suchThat`"
-                                 in parsed { consumed = Left msg }
+           Right res ->
+             if f res
+                then parsed
+                else let msg = "Predicate failed on `suchThat` when trying to parse the string "
+                            <> show (take 5 str)
+                            <> "..."
+                      in parsed { consumed = Left msg }
            _ -> { consumed: Left "Parse failed on `suchThat`", remaining: str }
 
 infixl 5 suchThat as |=
@@ -238,7 +249,10 @@ sat f = Parser \ str ->
             else let msg = "Character "
                         <> show c
                         <> " did not satisfy predicate"
-                  in { consumed: Left msg, remaining: drop 1 str }
+                        <> " when trying to parse the string "
+                        <> show (take 5 str)
+                        <> "..."
+                  in { consumed: Left msg, remaining: str }
        _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Match any character not in the foldable container.
@@ -255,6 +269,9 @@ isn'tAny s = Parser \ str ->
                                 <> show s
                                 <> " but found "
                                 <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
                           in { consumed: Left msg, remaining: str }
                     else { consumed: Right c, remaining: drop 1 str }
        _ -> { consumed: Left "Reached end of file", remaining: str }
@@ -270,10 +287,13 @@ anyOf s = Parser \ str ->
   case charAt 0 str of
        Just c -> if contains (fromChar c) s
                     then { consumed: Right c, remaining: drop 1 str }
-                    else let msg = "Expecting one of "
+                    else let msg = "Expected one of "
                                 <> show s
                                 <> " but found "
                                 <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
                           in { consumed: Left msg, remaining: str }
        _ -> { consumed: Left "Reached end of file", remaining: str }
 
@@ -282,10 +302,13 @@ char x = Parser \ str ->
   case charAt 0 str of
        Just c -> if c == x
                     then { consumed: Right c, remaining: drop 1 str }
-                    else let msg = "Expecting "
+                    else let msg = "Expected "
                                 <> show x
                                 <> " but found "
                                 <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
                           in { consumed: Left msg, remaining: str }
        _ -> { consumed: Left "Reached end of file", remaining: str }
 
@@ -300,38 +323,138 @@ string s = Parser \ str ->
              in { consumed: Left msg, remaining: str }
 
 digit :: Parser Char
-digit = (sat \ x -> x >= '0' && x <= '9') <?> "Expected a digit"
+digit = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if c >= '0' && c <= '9'
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expected a digit but found "
+                                <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Parse a lowercase character.
 lower :: Parser Char
-lower = (sat \ x -> x >= 'a' && x <= 'z') <?> "Expected a lower-case character"
+lower = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if c >= 'a' && c <= 'z'
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expected a lowercase character but found "
+                                <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Parse an uppercase character.
 upper :: Parser Char
-upper = (sat \ x -> x >= 'A' && x <= 'Z') <?> "Expected an upper-case character"
+upper = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if c >= 'A' && c <= 'Z'
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expected an uppercase character but found "
+                                <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 letter :: Parser Char
-letter = lower <|> upper <?> "Expected a letter"
+letter = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z'
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expected a letter but found "
+                                <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Parse a letter or a digit.
 alphanum :: Parser Char
-alphanum = letter <|> digit <?> "Expected a letter or a digit"
+alphanum = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9'
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expected alphanumeric character but found "
+                                <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 space :: Parser Char
-space = char ' ' <?> "Expected a space"
+space = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if c == ' '
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expected a space but found "
+                                <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 tab :: Parser Char
-tab = char '\t' <?> "Expected a tab"
+tab = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if c == '\t'
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expected a tab but found "
+                                <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 newline :: Parser Char
-newline = char '\n' <?> "Expected a newline"
+newline = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if c == '\n'
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expected a newline but found "
+                                <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 -- | Parse a carriage return.
 cr :: Parser Char
-cr = char '\r' <?> "Expected a carriage return"
+cr = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if c == '\r'
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expected carriage return but found "
+                                <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 whitespace :: Parser Char
-whitespace = space <|> tab <|> newline <|> cr <?> "Expected whitespace"
+whitespace = Parser \ str ->
+  case charAt 0 str of
+       Just c -> if c == '\r' || c == '\n' || c == '\t' || c == ' '
+                    then { consumed: Right c, remaining: drop 1 str }
+                    else let msg = "Expected whitespace but found "
+                                <> show c
+                                <> " when trying to parse the string "
+                                <> show (take 5 str)
+                                <> "..."
+                          in { consumed: Left msg, remaining: str }
+       _ -> { consumed: Left "Reached end of file", remaining: str }
 
 whitespaces :: Parser (List Char)
 whitespaces = many whitespace
@@ -341,12 +464,22 @@ skipSpaces = skip whitespaces
 
 -- | Contiguous strings with no tabs, spaces, carriage returns or newlines.
 word :: Parser String
-word = fromCharList <$> many (sat \ c ->
-  c /= ' ' && c /= '\t' && c /= '\r' && c /= '\n')
+word = fail "Expected contiguous string of nonwhitespace"
+   >|> fromCharList
+   <$> some (sat \ c -> c /= ' ' && c /= '\t' && c /= '\r' && c /= '\n')
 
 -- | Parse the end of a file, returning `Unit` to indicate success.
 eof :: Parser Unit
-eof = notFollowedBy item <?> "Expected empty string"
+eof = Parser \ str ->
+  case str of
+       "" -> { consumed: Right unit, remaining: str }
+       other ->
+         let msg = "Expected empty string but found "
+                <> show other
+                <> " when trying to parse the string "
+                <> show (take 5 str)
+                <> "..."
+          in { consumed: Left msg, remaining: str }
 
 numerals :: Parser String
 numerals = do
@@ -361,18 +494,18 @@ int = do
   n <- numerals
   case fromString n of
        Just x -> pure x
-       _ -> empty
+       _ -> fail $ "Expected an int but found " <> show n
 
 -- | Parse a `Number`. The string must have digits surrounding a decimal point.
 number :: Parser Number
-number = do
+number = fail "Expected a number" >|> do
   integral <- numerals
   char '.'
   fractional <- fromCharList <$> many digit
   pure $ readFloat $ integral <> "." <> fractional
 
 boolean :: Parser Boolean
-boolean = do
+boolean = fail "Expected a boolean" >|> do
   x <- string "true" <|> string "false"
   pure case x of
             "true" -> true

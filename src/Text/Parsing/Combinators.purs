@@ -38,11 +38,6 @@ bracket left target right = left *> target <* right
 -- | Parse as many times as possible, giving a `List`.
 many :: forall m a. MonadPlus m => m a -> m (List a)
 many p = many1 p <|> pure Nil
---many p = parsed <|> pure Nil where
-  --parsed = do
-    --x <- p
-    --xs <- many p
-    --pure (x : xs)
 
 -- | Parse at least once, giving a `List`.
 many1 :: forall m a. MonadPlus m => m a -> m (List a)
