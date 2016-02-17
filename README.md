@@ -70,7 +70,7 @@ data PositiveTupleInt = PositiveTupleInt Int Int
 parseTupleIntA :: Parser PositiveTupleInt
 parseTupleIntA = TupleInt <$> (char '(' *> int |= (> 0) <* char ',') <*> (int |= (> 0) <* char ')')
 
-parseTupleIntM :: Parser TupleInt
+parseTupleIntM :: Parser PositiveTupleInt
 parseTupleIntM = fail "Expected TupleInt of the form (x,y)" >|> do
   char '('
   fst <- int `suchThat` (> 0)
