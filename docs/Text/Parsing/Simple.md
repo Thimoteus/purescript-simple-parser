@@ -67,6 +67,40 @@ infixr 3 altR as >|>
 
 _right-associative / precedence 3_
 
+#### `applyL`
+
+``` purescript
+applyL :: forall a b. Parser a -> Parser b -> Parser a
+```
+
+Equivalent to (<*) but faster since it doesn't require passing typeclass
+dictionaries.
+
+#### `(<<)`
+
+``` purescript
+infixl 4 applyL as <<
+```
+
+_left-associative / precedence 4_
+
+#### `applyR`
+
+``` purescript
+applyR :: forall a b. Parser a -> Parser b -> Parser b
+```
+
+Equivalent to (*>) but faster since it doesn't require passing typeclass
+dictionaries.
+
+#### `(>>)`
+
+``` purescript
+infixl 4 applyR as >>
+```
+
+_left-associative / precedence 4_
+
 #### `fromCharList`
 
 ``` purescript

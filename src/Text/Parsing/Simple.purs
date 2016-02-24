@@ -4,6 +4,8 @@ module Text.Parsing.Simple
   -- utility functions
   , altL, (<|<)
   , altR, (>|>)
+  , applyL, (<<)
+  , applyR, (>>)
   , fromCharList
   -- polymorphic Parser-specific combinators
   , none
@@ -126,6 +128,32 @@ altR (Parser x) (Parser y) =
                        _ -> x str
 
 infixr 3 altR as >|>
+
+-- | Equivalent to (<*) but faster since it doesn't require passing typeclass
+-- | dictionaries.
+applyL :: forall a b. Parser a -> Parser b -> Parser a
+applyL (Parser f) (Parser g) = Parser \ str ->
+  let x = f str
+   in case x.consumed of
+           t@(Right _) ->
+             let y = g x.remaining
+              in case y.consumed of
+                      Right _ -> { consumed: t, remaining: y.remaining }
+                      Left s -> { consumed: Left s, remaining: x.remaining }
+           _ -> x
+
+infixl 4 applyL as <<
+
+-- | Equivalent to (*>) but faster since it doesn't require passing typeclass
+-- | dictionaries.
+applyR :: forall a b. Parser a -> Parser b -> Parser b
+applyR (Parser f) (Parser g) = Parser \ str ->
+  let x = f str
+   in case x.consumed of
+           (Right _) -> g x.remaining
+           (Left s) -> { consumed: Left s, remaining: x.remaining }
+
+infixl 4 applyR as >>
 
 fromCharList :: forall f. Foldable f => f Char -> String
 fromCharList = foldMap fromChar

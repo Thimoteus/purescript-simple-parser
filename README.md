@@ -68,7 +68,7 @@ import Text.Parsing.Combinators as C
 data PositiveTupleInt = PositiveTupleInt Int Int
 
 parseTupleIntA :: Parser PositiveTupleInt
-parseTupleIntA = TupleInt <$> (char '(' *> int |= (> 0) <* char ',') <*> (int |= (> 0) <* char ')')
+parseTupleIntA = PositiveTupleInt <$> (char '(' *> int |= (> 0) <* char ',') <*> (int |= (> 0) <* char ')')
 
 parseTupleIntM :: Parser PositiveTupleInt
 parseTupleIntM = fail "Expected TupleInt of the form (x,y)" >|> do
