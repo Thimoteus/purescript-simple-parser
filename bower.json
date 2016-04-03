@@ -4,6 +4,7 @@
   "keywords": [
     "purescript"
   ],
+  "license": "MIT",
   "ignore": [
     "**/.*",
     "bower_components",
