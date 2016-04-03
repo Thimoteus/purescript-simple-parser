@@ -22,6 +22,13 @@ Backtracking by default:
 Right ('9')
 ```
 
+With a `Semigroup` instance (plus appropriate combinators) that does not:
+
+```purescript
+parse (string' "hello" <> string' "hell0") "hell0"
+Left ("Expecting \"hell0\" but found \"\"")
+```
+
 Brand-new combinators (such as `atLeast`, `atMost`, `exactly`, `suchThat`):
 
 ```purescript
@@ -35,7 +42,7 @@ Explicit left- and right-leaning versions of Control.Alt.alt (aka (<|>)):
 vowels :: Parser Char
 vowels = fail "Expected a, e, i, o, or u" >|> do
   c <- item
-  pure c |= (`elem` ['a', 'e', 'i', 'o', 'u'])
+  pure c |= (_ `elem` ['a', 'e', 'i', 'o', 'u'])
 ```
 
 Versions of common combinators optimized for speed,
@@ -59,6 +66,8 @@ any parser that has instances for `Alt`, `MonadPlus`, etc.
 The `Text.Parsing.Simple` module has combinators made specifically for its
 `Parser` data type.
 
+Combinators that don't backtrack by default are denoted by a prime, for example: `alphanum` vs. `alphanum'`. These are meant to be used in combination with the `Semigroup` instance instead of `Alt`.
+
 Example:
 
 ```purescript
@@ -68,14 +77,14 @@ import Text.Parsing.Combinators as C
 data PositiveTupleInt = PositiveTupleInt Int Int
 
 parseTupleIntA :: Parser PositiveTupleInt
-parseTupleIntA = PositiveTupleInt <$> (char '(' *> int |= (> 0) <* char ',') <*> (int |= (> 0) <* char ')')
+parseTupleIntA = PositiveTupleInt <$> (char '(' *> int |= (_ > 0) <* char ',') <*> (int |= (_ > 0) <* char ')')
 
-parseTupleIntM :: Parser PositiveTupleInt
+aprseTupleIntM :: Parser PositiveTupleInt
 parseTupleIntM = fail "Expected TupleInt of the form (x,y)" >|> do
   char '('
-  fst <- int `suchThat` (> 0)
+  fst <- int `suchThat` (_ > 0)
   char ','
-  snd <- int `suchThat` (> 0)
+  snd <- int `suchThat` (_ > 0)
   char ')'
   return $ PositiveTupleInt fst snd
 
