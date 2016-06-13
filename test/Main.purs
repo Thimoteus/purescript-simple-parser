@@ -3,7 +3,7 @@ module Test.Main where
 import Prelude
 import Text.Parsing.Simple
 import Text.Parsing.Combinators
-import Control.Monad.Eff.Console (print)
+import Control.Monad.Eff.Console (logShow)
 
 type Year = Int
 type Day = Int
@@ -37,7 +37,7 @@ instance showMonth :: Show Month where
                 Dec -> "Dec"
 
 instance showDate :: Show Date where
-  show (Date y m d) = "Year " ++ show y ++ ", Month " ++ show m ++ ", Day " ++ show d
+  show (Date y m d) = "Year " <> show y <> ", Month " <> show m <> ", Day " <> show d
 
 dateString :: String
 dateString = "Jan 31, 2001"
@@ -68,6 +68,7 @@ dateParser = do
                 "Oct" -> Oct
                 "Nov" -> Nov
                 "Dec" -> Dec
+                _ -> Jan
 
     parseMonthStr :: Parser String
     parseMonthStr =
@@ -85,4 +86,4 @@ dateParser = do
              , string "Dec"
              ]
 
-main = print $ parse dateParser dateString
+main = logShow $ parse dateParser dateString
