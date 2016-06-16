@@ -2,8 +2,8 @@ module Text.Parsing.Simple
   -- definitional exports
   ( Parser(), ParseError(), parse
   -- utility functions
-  , altL, (<|<)
-  , altR, (>|>)
+  , altL, (<|)
+  , altR, (|>)
   , applyL, (<<)
   , applyR, (>>)
   , fromCharList
@@ -37,7 +37,7 @@ module Text.Parsing.Simple
 import Prelude
 import Global (readFloat)
 
-import Control.Alt (class Alt, (<|>))
+import Control.Alt (class Alt)
 import Control.Plus (class Plus)
 import Control.Alternative (class Alternative)
 import Control.MonadZero (class MonadZero)
@@ -51,11 +51,11 @@ import Data.Foldable (class Foldable, foldMap, notElem, elem)
 import Data.String (singleton, indexOf, drop, length, charAt, contains, take)
 import Data.List (List(..), (:), reverse)
 import Data.Int (fromString)
+import Data.Functor ((<$))
 
 type ParseError = String
-newtype Parser a = Parser (String -> { consumed :: Either ParseError a
-                                     , remaining :: String
-                                     })
+newtype Parser a =
+  Parser (String -> { consumed :: Either ParseError a, remaining :: String })
 
 -- | Unwraps the `newtype`, giving you a function which takes a `String` and
 -- | returns a product of already-parsed data and the remaining `String`.
@@ -77,7 +77,7 @@ instance monoidParser :: Monoid (Parser a) where
   mempty = none
 
 instance lazyParser :: Lazy (Parser a) where
-  defer f = Parser \ str -> runParser (f unit) str
+  defer f = Parser (runParser (f unit))
 
 instance functorParser :: Functor Parser where
   map f (Parser p) = Parser \ str ->
@@ -126,7 +126,7 @@ altL (Parser x) (Parser y) =
                        Right _ -> z
                        _ -> y str
 
-infixl 3 altL as <|<
+infixl 3 altL as <|
 
 altR :: forall a. Parser a -> Parser a -> Parser a
 altR (Parser x) (Parser y) =
@@ -135,7 +135,7 @@ altR (Parser x) (Parser y) =
                        Right _ -> z
                        _ -> x str
 
-infixr 3 altR as >|>
+infixr 3 altR as |>
 
 -- | Equivalent to (<*) but faster since it doesn't require passing typeclass
 -- | dictionaries.
@@ -709,7 +709,7 @@ skipSpaces = skip whitespaces
 -- | Contiguous strings with no tabs, spaces, carriage returns or newlines.
 word :: Parser String
 word = fail "Expected contiguous string of nonwhitespace"
-   >|> fromCharList
+    |> fromCharList
    <$> some (sat \ c -> c /= ' ' && c /= '\t' && c /= '\r' && c /= '\n')
 
 -- | Parse the end of a file, returning `Unit` to indicate success.
@@ -727,7 +727,7 @@ eof = Parser \ str ->
 
 numerals :: Parser String
 numerals = do
-  first <- digit <|> char '-'
+  first <- digit <| char '-'
   digits <- many digit
   pure $ fromCharList (first : digits)
 
@@ -742,15 +742,13 @@ int = do
 
 -- | Parse a `Number`. The string must have digits surrounding a decimal point.
 number :: Parser Number
-number = fail "Expected a number" >|> do
+number = fail "Expected a number" |> do
   integral <- numerals
   char '.'
   fractional <- fromCharList <$> many digit
   pure $ readFloat $ integral <> "." <> fractional
 
 boolean :: Parser Boolean
-boolean = fail "Expected a boolean" >|> do
-  x <- string "true" <|> string "false"
-  pure case x of
-            "true" -> true
-            _ -> false
+boolean =
+  true <$ string "true" <| false <$ string "false" <?> "Expected a boolean"
+

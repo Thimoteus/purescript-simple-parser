@@ -2,8 +2,13 @@ module Test.Main where
 
 import Prelude
 import Text.Parsing.Simple
-import Text.Parsing.Combinators
+import Text.Parsing.Combinators (sepBy, choice)
 import Control.Monad.Eff.Console (logShow)
+import Data.List (List)
+
+main = do
+  logShow $ parse dateParser dateString
+  logShow $ parse expr testSexpr
 
 type Year = Int
 type Day = Int
@@ -86,4 +91,28 @@ dateParser = do
              , string "Dec"
              ]
 
-main = logShow $ parse dateParser dateString
+-- | Simple s-expression lang
+
+data Expr = Lit Int
+          | List (List Expr)
+
+instance showExpr :: Show Expr where
+  show (Lit n) = show n
+  show (List xs) = show xs
+
+parseLit :: Parser Expr
+parseLit = Lit <$> int
+
+parseList :: Parser Expr -> Parser Expr
+parseList p = List <$> do
+  char '('
+  es <- p `sepBy` whitespace
+  char ')'
+  pure es
+
+testSexpr :: String
+testSexpr = "(1 (2 3))"
+
+expr :: Parser Expr
+expr = fix f where
+  f p = parseList p <| parseLit

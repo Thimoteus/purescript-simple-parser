@@ -1,5 +1,11 @@
 ## Module Text.Parsing.Simple
 
+#### `ParseError`
+
+``` purescript
+type ParseError = String
+```
+
 #### `Parser`
 
 ``` purescript
@@ -19,17 +25,9 @@ Applicative Parser
 Bind Parser
 Monad Parser
 Alternative Parser
+MonadZero Parser
 MonadPlus Parser
 ```
-
-#### `runParser`
-
-``` purescript
-runParser :: forall a. Parser a -> String -> { consumed :: Either ParseError a, remaining :: String }
-```
-
-Unwraps the `newtype`, giving you a function which takes a `String` and
-returns a product of already-parsed data and the remaining `String`.
 
 #### `parse`
 
@@ -45,13 +43,11 @@ Run a parser against a `String`, either getting an error or a value.
 altL :: forall a. Parser a -> Parser a -> Parser a
 ```
 
-#### `(<|<)`
+#### `(<|)`
 
 ``` purescript
-infixl 3 altL as <|<
+infixl 3 altL as <|
 ```
-
-_left-associative / precedence 3_
 
 #### `altR`
 
@@ -59,13 +55,11 @@ _left-associative / precedence 3_
 altR :: forall a. Parser a -> Parser a -> Parser a
 ```
 
-#### `(>|>)`
+#### `(|>)`
 
 ``` purescript
-infixr 3 altR as >|>
+infixr 3 altR as |>
 ```
-
-_right-associative / precedence 3_
 
 #### `applyL`
 
@@ -82,8 +76,6 @@ dictionaries.
 infixl 4 applyL as <<
 ```
 
-_left-associative / precedence 4_
-
 #### `applyR`
 
 ``` purescript
@@ -99,12 +91,10 @@ dictionaries.
 infixl 4 applyR as >>
 ```
 
-_left-associative / precedence 4_
-
 #### `fromCharList`
 
 ``` purescript
-fromCharList :: forall f. (Foldable f) => f Char -> String
+fromCharList :: forall f. Foldable f => f Char -> String
 ```
 
 #### `none`
@@ -134,8 +124,6 @@ orFailWith :: forall a. Parser a -> ParseError -> Parser a
 ``` purescript
 infix 0 orFailWith as <?>
 ```
-
-_non-associative / precedence 0_
 
 #### `try`
 
@@ -221,8 +209,6 @@ If the parse fails, it will backtrack.
 infixl 5 suchThat as |=
 ```
 
-_left-associative / precedence 5_
-
 #### `item`
 
 ``` purescript
@@ -239,13 +225,25 @@ sat :: (Char -> Boolean) -> Parser Char
 
 Create a parser from a `Char`acteristic function.
 
+#### `sat'`
+
+``` purescript
+sat' :: (Char -> Boolean) -> Parser Char
+```
+
 #### `isn'tAnyF`
 
 ``` purescript
-isn'tAnyF :: forall f. (Foldable f) => f Char -> Parser Char
+isn'tAnyF :: forall f. Foldable f => f Char -> Parser Char
 ```
 
 Match any character not in the foldable container.
+
+#### `isn'tAnyF'`
+
+``` purescript
+isn'tAnyF' :: forall f. Foldable f => f Char -> Parser Char
+```
 
 #### `isn'tAny`
 
@@ -256,13 +254,25 @@ isn'tAny :: String -> Parser Char
 Match any character not in the string.
 Equivalent to `isn'tAnyF <<< toCharArray`.
 
+#### `isn'tAny'`
+
+``` purescript
+isn'tAny' :: String -> Parser Char
+```
+
 #### `anyOfF`
 
 ``` purescript
-anyOfF :: forall f. (Foldable f) => f Char -> Parser Char
+anyOfF :: forall f. Foldable f => f Char -> Parser Char
 ```
 
 Match any character in the foldable container.
+
+#### `anyOfF'`
+
+``` purescript
+anyOfF' :: forall f. Foldable f => f Char -> Parser Char
+```
 
 #### `anyOf`
 
@@ -273,10 +283,22 @@ anyOf :: String -> Parser Char
 Match any character in the string.
 Equivalent to `anyOfF <<< toCharArray`.
 
+#### `anyOf'`
+
+``` purescript
+anyOf' :: String -> Parser Char
+```
+
 #### `char`
 
 ``` purescript
 char :: Char -> Parser Char
+```
+
+#### `char'`
+
+``` purescript
+char' :: Char -> Parser Char
 ```
 
 #### `string`
@@ -285,10 +307,30 @@ char :: Char -> Parser Char
 string :: String -> Parser String
 ```
 
+#### `string'`
+
+``` purescript
+string' :: String -> Parser String
+```
+
+#### `tail`
+
+``` purescript
+tail :: Parser String
+```
+
+Matches the unparsed portion of the input.
+
 #### `digit`
 
 ``` purescript
 digit :: Parser Char
+```
+
+#### `digit'`
+
+``` purescript
+digit' :: Parser Char
 ```
 
 #### `lower`
@@ -299,6 +341,12 @@ lower :: Parser Char
 
 Parse a lowercase character.
 
+#### `lower'`
+
+``` purescript
+lower' :: Parser Char
+```
+
 #### `upper`
 
 ``` purescript
@@ -307,10 +355,22 @@ upper :: Parser Char
 
 Parse an uppercase character.
 
+#### `upper'`
+
+``` purescript
+upper' :: Parser Char
+```
+
 #### `letter`
 
 ``` purescript
 letter :: Parser Char
+```
+
+#### `letter'`
+
+``` purescript
+letter' :: Parser Char
 ```
 
 #### `alphanum`
@@ -321,10 +381,22 @@ alphanum :: Parser Char
 
 Parse a letter or a digit.
 
+#### `alphanum'`
+
+``` purescript
+alphanum' :: Parser Char
+```
+
 #### `space`
 
 ``` purescript
 space :: Parser Char
+```
+
+#### `space'`
+
+``` purescript
+space' :: Parser Char
 ```
 
 #### `tab`
@@ -333,10 +405,22 @@ space :: Parser Char
 tab :: Parser Char
 ```
 
+#### `tab'`
+
+``` purescript
+tab' :: Parser Char
+```
+
 #### `newline`
 
 ``` purescript
 newline :: Parser Char
+```
+
+#### `newline'`
+
+``` purescript
+newline' :: Parser Char
 ```
 
 #### `cr`
@@ -347,10 +431,22 @@ cr :: Parser Char
 
 Parse a carriage return.
 
+#### `cr'`
+
+``` purescript
+cr' :: Parser Char
+```
+
 #### `whitespace`
 
 ``` purescript
 whitespace :: Parser Char
+```
+
+#### `whitespace'`
+
+``` purescript
+whitespace' :: Parser Char
 ```
 
 #### `whitespaces`

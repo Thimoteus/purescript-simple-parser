@@ -11,7 +11,7 @@ Choose the first successful element from a foldable container of parsers.
 #### `option`
 
 ``` purescript
-option :: forall m a. (Alternative m) => a -> m a -> m a
+option :: forall m a. Alternative m => a -> m a -> m a
 ```
 
 Attempt a parse, with a default value in case of failure.
@@ -19,7 +19,7 @@ Attempt a parse, with a default value in case of failure.
 #### `bracket`
 
 ``` purescript
-bracket :: forall m l r a. (Applicative m) => m l -> m a -> m r -> m a
+bracket :: forall m l r a. Applicative m => m l -> m a -> m r -> m a
 ```
 
 Parse something surrounded by given arguments.
@@ -27,7 +27,7 @@ Parse something surrounded by given arguments.
 #### `many`
 
 ``` purescript
-many :: forall m a. (MonadPlus m) => m a -> m (List a)
+many :: forall m a. MonadPlus m => m a -> m (List a)
 ```
 
 Parse as many times as possible, giving a `List`.
@@ -35,7 +35,7 @@ Parse as many times as possible, giving a `List`.
 #### `many1`
 
 ``` purescript
-many1 :: forall m a. (MonadPlus m) => m a -> m (List a)
+many1 :: forall m a. MonadPlus m => m a -> m (List a)
 ```
 
 Parse at least once, giving a `List`.
@@ -43,7 +43,7 @@ Parse at least once, giving a `List`.
 #### `exactly`
 
 ``` purescript
-exactly :: forall m a. (Applicative m) => Int -> m a -> m (List a)
+exactly :: forall m a. Applicative m => Int -> m a -> m (List a)
 ```
 
 `exactly n p` fails iff `many p` would produce a list of length < n.
@@ -59,7 +59,7 @@ Nothing
 #### `atLeast`
 
 ``` purescript
-atLeast :: forall m a. (MonadPlus m) => Int -> m a -> m (List a)
+atLeast :: forall m a. MonadPlus m => Int -> m a -> m (List a)
 ```
 
 `atLeast n p` fails iff `exactly n p` does, but it differs in that there is
@@ -68,7 +68,7 @@ no upper bound on the length of the produced list.
 #### `atMost`
 
 ``` purescript
-atMost :: forall m a. (MonadPlus m) => Int -> m a -> m (List a)
+atMost :: forall m a. MonadPlus m => Int -> m a -> m (List a)
 ```
 
 `atMost n p` never fails and never produces a list of length larger than n.
@@ -76,7 +76,7 @@ atMost :: forall m a. (MonadPlus m) => Int -> m a -> m (List a)
 #### `sepBy`
 
 ``` purescript
-sepBy :: forall m a b. (MonadPlus m) => m a -> m b -> m (List a)
+sepBy :: forall m a b. MonadPlus m => m a -> m b -> m (List a)
 ```
 
 Given a value to parse and a separating parser, put all the values it finds
@@ -90,7 +90,7 @@ Just (Cons (123) (Cons (456) (Cons (789) (Nil))))
 #### `sepBy1`
 
 ``` purescript
-sepBy1 :: forall m a b. (MonadPlus m) => m a -> m b -> m (List a)
+sepBy1 :: forall m a b. MonadPlus m => m a -> m b -> m (List a)
 ```
 
 Parse one or more occurrences, separated by a delimiter.
@@ -98,7 +98,7 @@ Parse one or more occurrences, separated by a delimiter.
 #### `sepEndBy`
 
 ``` purescript
-sepEndBy :: forall m a b. (MonadPlus m) => m a -> m b -> m (List a)
+sepEndBy :: forall m a b. MonadPlus m => m a -> m b -> m (List a)
 ```
 
 Does the same as `sepBy`, but requires the separating parser to appear at
