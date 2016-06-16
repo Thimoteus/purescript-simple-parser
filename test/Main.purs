@@ -72,8 +72,7 @@ dateParser = do
                 "Sep" -> Sep
                 "Oct" -> Oct
                 "Nov" -> Nov
-                "Dec" -> Dec
-                _ -> Jan
+                _ -> Dec
 
     parseMonthStr :: Parser String
     parseMonthStr =
@@ -94,14 +93,19 @@ dateParser = do
 -- | Simple s-expression lang
 
 data Expr = Lit Int
+          | Atom String
           | List (List Expr)
 
 instance showExpr :: Show Expr where
   show (Lit n) = show n
   show (List xs) = show xs
+  show (Atom s) = s
 
 parseLit :: Parser Expr
 parseLit = Lit <$> int
+
+parseAtom :: Parser Expr
+parseAtom = Atom <$> manyChar alphanum
 
 parseList :: Parser Expr -> Parser Expr
 parseList p = List <$> do
@@ -111,8 +115,8 @@ parseList p = List <$> do
   pure es
 
 testSexpr :: String
-testSexpr = "(1 (2 3))"
+testSexpr = "(add (mul (times 2 3) (plus 7 7)) (plus 19 19))"
 
 expr :: Parser Expr
 expr = fix f where
-  f p = parseList p <| parseLit
+  f p = parseList p <| parseLit <| parseAtom

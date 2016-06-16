@@ -32,7 +32,7 @@ Left ("Expecting \"hell0\" but found \"\"")
 Brand-new combinators (such as `atLeast`, `atMost`, `exactly`, `suchThat`):
 
 ```purescript
-> parse (fromCharList <$> atLeast 3 (item `suchThat` (< 'c'))) "abcd"
+> parse (fromCharList <$> atLeast 3 (item `suchThat` (_ < 'c'))) "abcd"
 Left ("Predicate failed on `suchThat` when trying to parse the string \"cd\"...")
 ```
 
@@ -40,7 +40,7 @@ Explicit left- and right-leaning versions of Control.Alt.alt (aka (<|>)):
 
 ```purescript
 vowels :: Parser Char
-vowels = fail "Expected a, e, i, o, or u" >|> do
+vowels = fail "Expected a, e, i, o, or u" |> do
   c <- item
   pure c |= (_ `elem` ['a', 'e', 'i', 'o', 'u'])
 ```
@@ -80,7 +80,7 @@ parseTupleIntA :: Parser PositiveTupleInt
 parseTupleIntA = PositiveTupleInt <$> (char '(' *> int |= (_ > 0) <* char ',') <*> (int |= (_ > 0) <* char ')')
 
 aprseTupleIntM :: Parser PositiveTupleInt
-parseTupleIntM = fail "Expected TupleInt of the form (x,y)" >|> do
+parseTupleIntM = fail "Expected TupleInt of the form (x,y)" |> do
   char '('
   fst <- int `suchThat` (_ > 0)
   char ','

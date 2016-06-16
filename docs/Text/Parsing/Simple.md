@@ -158,7 +158,7 @@ Attempt a parse one or more times.
 fix :: forall a. (Parser a -> Parser a) -> Parser a
 ```
 
-Find a function's least fixed point.
+Find a function's least fixed point using the Z combinator.
 
 #### `lookahead`
 
@@ -209,6 +209,14 @@ If the parse fails, it will backtrack.
 infixl 5 suchThat as |=
 ```
 
+#### `tail`
+
+``` purescript
+tail :: Parser String
+```
+
+Matches the unparsed portion of the input.
+
 #### `item`
 
 ``` purescript
@@ -223,13 +231,8 @@ Parse a single `Char`.
 sat :: (Char -> Boolean) -> Parser Char
 ```
 
+## Backtracking combinators
 Create a parser from a `Char`acteristic function.
-
-#### `sat'`
-
-``` purescript
-sat' :: (Char -> Boolean) -> Parser Char
-```
 
 #### `isn'tAnyF`
 
@@ -238,12 +241,6 @@ isn'tAnyF :: forall f. Foldable f => f Char -> Parser Char
 ```
 
 Match any character not in the foldable container.
-
-#### `isn'tAnyF'`
-
-``` purescript
-isn'tAnyF' :: forall f. Foldable f => f Char -> Parser Char
-```
 
 #### `isn'tAny`
 
@@ -254,12 +251,6 @@ isn'tAny :: String -> Parser Char
 Match any character not in the string.
 Equivalent to `isn'tAnyF <<< toCharArray`.
 
-#### `isn'tAny'`
-
-``` purescript
-isn'tAny' :: String -> Parser Char
-```
-
 #### `anyOfF`
 
 ``` purescript
@@ -267,12 +258,6 @@ anyOfF :: forall f. Foldable f => f Char -> Parser Char
 ```
 
 Match any character in the foldable container.
-
-#### `anyOfF'`
-
-``` purescript
-anyOfF' :: forall f. Foldable f => f Char -> Parser Char
-```
 
 #### `anyOf`
 
@@ -283,22 +268,10 @@ anyOf :: String -> Parser Char
 Match any character in the string.
 Equivalent to `anyOfF <<< toCharArray`.
 
-#### `anyOf'`
-
-``` purescript
-anyOf' :: String -> Parser Char
-```
-
 #### `char`
 
 ``` purescript
 char :: Char -> Parser Char
-```
-
-#### `char'`
-
-``` purescript
-char' :: Char -> Parser Char
 ```
 
 #### `string`
@@ -307,30 +280,10 @@ char' :: Char -> Parser Char
 string :: String -> Parser String
 ```
 
-#### `string'`
-
-``` purescript
-string' :: String -> Parser String
-```
-
-#### `tail`
-
-``` purescript
-tail :: Parser String
-```
-
-Matches the unparsed portion of the input.
-
 #### `digit`
 
 ``` purescript
 digit :: Parser Char
-```
-
-#### `digit'`
-
-``` purescript
-digit' :: Parser Char
 ```
 
 #### `lower`
@@ -341,12 +294,6 @@ lower :: Parser Char
 
 Parse a lowercase character.
 
-#### `lower'`
-
-``` purescript
-lower' :: Parser Char
-```
-
 #### `upper`
 
 ``` purescript
@@ -355,22 +302,10 @@ upper :: Parser Char
 
 Parse an uppercase character.
 
-#### `upper'`
-
-``` purescript
-upper' :: Parser Char
-```
-
 #### `letter`
 
 ``` purescript
 letter :: Parser Char
-```
-
-#### `letter'`
-
-``` purescript
-letter' :: Parser Char
 ```
 
 #### `alphanum`
@@ -381,22 +316,10 @@ alphanum :: Parser Char
 
 Parse a letter or a digit.
 
-#### `alphanum'`
-
-``` purescript
-alphanum' :: Parser Char
-```
-
 #### `space`
 
 ``` purescript
 space :: Parser Char
-```
-
-#### `space'`
-
-``` purescript
-space' :: Parser Char
 ```
 
 #### `tab`
@@ -405,22 +328,10 @@ space' :: Parser Char
 tab :: Parser Char
 ```
 
-#### `tab'`
-
-``` purescript
-tab' :: Parser Char
-```
-
 #### `newline`
 
 ``` purescript
 newline :: Parser Char
-```
-
-#### `newline'`
-
-``` purescript
-newline' :: Parser Char
 ```
 
 #### `cr`
@@ -431,16 +342,108 @@ cr :: Parser Char
 
 Parse a carriage return.
 
-#### `cr'`
-
-``` purescript
-cr' :: Parser Char
-```
-
 #### `whitespace`
 
 ``` purescript
 whitespace :: Parser Char
+```
+
+#### `sat'`
+
+``` purescript
+sat' :: (Char -> Boolean) -> Parser Char
+```
+
+## Non-backtracking combinators
+
+#### `isn'tAnyF'`
+
+``` purescript
+isn'tAnyF' :: forall f. Foldable f => f Char -> Parser Char
+```
+
+#### `isn'tAny'`
+
+``` purescript
+isn'tAny' :: String -> Parser Char
+```
+
+#### `anyOfF'`
+
+``` purescript
+anyOfF' :: forall f. Foldable f => f Char -> Parser Char
+```
+
+#### `anyOf'`
+
+``` purescript
+anyOf' :: String -> Parser Char
+```
+
+#### `char'`
+
+``` purescript
+char' :: Char -> Parser Char
+```
+
+#### `string'`
+
+``` purescript
+string' :: String -> Parser String
+```
+
+#### `digit'`
+
+``` purescript
+digit' :: Parser Char
+```
+
+#### `lower'`
+
+``` purescript
+lower' :: Parser Char
+```
+
+#### `upper'`
+
+``` purescript
+upper' :: Parser Char
+```
+
+#### `letter'`
+
+``` purescript
+letter' :: Parser Char
+```
+
+#### `alphanum'`
+
+``` purescript
+alphanum' :: Parser Char
+```
+
+#### `space'`
+
+``` purescript
+space' :: Parser Char
+```
+
+#### `tab'`
+
+``` purescript
+tab' :: Parser Char
+```
+
+#### `newline'`
+
+``` purescript
+newline' :: Parser Char
+```
+
+#### `cr'`
+
+``` purescript
+cr' :: Parser Char
 ```
 
 #### `whitespace'`
@@ -455,11 +458,31 @@ whitespace' :: Parser Char
 whitespaces :: Parser (List Char)
 ```
 
+## Higher-order combinators
+
 #### `skipSpaces`
 
 ``` purescript
 skipSpaces :: Parser Unit
 ```
+
+#### `manyChar`
+
+``` purescript
+manyChar :: Parser Char -> Parser String
+```
+
+Parse a natural number amount of a given `Char` parser, resulting in a
+`String`.
+
+#### `someChar`
+
+``` purescript
+someChar :: Parser Char -> Parser String
+```
+
+Parse a positive integral amount of a given `Char` parser, resulting in a
+`String`.
 
 #### `word`
 
@@ -476,6 +499,16 @@ eof :: Parser Unit
 ```
 
 Parse the end of a file, returning `Unit` to indicate success.
+
+#### `integral`
+
+``` purescript
+integral :: Parser String
+```
+
+Parse an integer value as a `String`. Useful if needing to parse integers
+that are outside of `Int`'s bounds. You could then combine this with, e.g.
+`purescript-hugenum`'s `Data.HugeInt.fromString`.
 
 #### `int`
 
