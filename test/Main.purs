@@ -2,13 +2,13 @@ module Test.Main where
 
 import Prelude
 import Text.Parsing.Simple
-import Text.Parsing.Combinators (sepBy, choice)
+import Text.Parsing.Combinators (choice, bracket)
 import Control.Monad.Eff.Console (logShow)
 import Data.List (List)
 
 main = do
   logShow $ parse dateParser dateString
-  logShow $ parse expr testSexpr
+  logShow $ parse exprs testSexpr
 
 type Year = Int
 type Day = Int
@@ -101,22 +101,43 @@ instance showExpr :: Show Expr where
   show (List xs) = show xs
   show (Atom s) = s
 
+skipmany :: forall a. Parser a -> Parser Unit
+skipmany p = skipsome p <| pure unit
+
+skipsome :: forall a. Parser a -> Parser Unit
+skipsome p = do
+  x <- p
+  xs <- skipmany p
+  pure unit
+
+singleComment :: Parser Unit
+singleComment = do
+  char ';'
+  skipmany $ sat (_ /= '\n')
+
+simplespace :: Parser Unit
+simplespace = skipsome $ sat \ c -> c == ' ' || c == '\n' || c == '\r' || c == '\t'
+
+spaces :: Parser Unit
+spaces = skipmany (simplespace <| singleComment)
+
 parseLit :: Parser Expr
 parseLit = Lit <$> int
 
 parseAtom :: Parser Expr
-parseAtom = Atom <$> manyChar alphanum
+parseAtom = Atom <$> someChar alphanum
 
 parseList :: Parser Expr -> Parser Expr
-parseList p = List <$> do
-  char '('
-  es <- p `sepBy` whitespace
-  char ')'
-  pure es
+parseList p = List <$> p `sepBy` whitespace
 
 testSexpr :: String
-testSexpr = "(add (mul (times 2 3) (plus 7 7)) (plus 19 19))"
+testSexpr = "(add (mul (div 2 (add 9 9)) (sub 9 99)) 18)"
 
 expr :: Parser Expr
 expr = fix f where
-  f p = parseList p <| parseLit <| parseAtom
+  f p = parseLit <| parseAtom <| bracket (char '(') (parseList p) (char ')')
+
+exprs :: Parser (List Expr)
+exprs = do
+  spaces
+  expr `sepBy` whitespace

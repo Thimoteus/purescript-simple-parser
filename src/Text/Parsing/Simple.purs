@@ -18,6 +18,7 @@ module Text.Parsing.Simple
   , notFollowedBy
   , skip
   , suchThat, (|=)
+  , sepBy, sepBy1
   -- non-polymorphic Parsers
   , item
   , sat, sat'
@@ -269,6 +270,12 @@ suchThat (Parser p) f = Parser \ str ->
            _ -> Result (Left "Parse failed on `suchThat`") str
 
 infixl 5 suchThat as |=
+
+sepBy :: forall a b. Parser a -> Parser b -> Parser (List a)
+sepBy target separator = sepBy1 target separator <| pure Nil
+
+sepBy1 :: forall a b. Parser a -> Parser b -> Parser (List a)
+sepBy1 target separator = Cons <$> target <*> many (separator >> target)
 
 -- | Matches the unparsed portion of the input.
 tail :: Parser String
