@@ -2,7 +2,7 @@ module Text.Parsing.Simple
   -- definitional exports
   ( Parser, ParseError, parse
   -- utility functions
-  , modify
+  , modify, modifyM, modifyE
   , altL, (<|)
   , altR, (|>)
   , applyL, (<<)
@@ -133,6 +133,16 @@ instance monadPlusParser :: Show s => MonadPlus (Parser s)
 
 modify :: forall s a. (s -> s) -> Parser s a -> Parser s a
 modify f (Parser x) = Parser \ str -> x (f str)
+
+modifyM :: forall s a. (s -> Maybe s) -> Parser s a -> Parser s a
+modifyM f (Parser x) = Parser \ str -> case f str of
+  Just y -> x y
+  _ -> Result (Left "Encountered `Nothing` in `modifyM`") str
+
+modifyE :: forall s err a. Show err => (s -> Either err s) -> Parser s a -> Parser s a
+modifyE f (Parser x) = Parser \ str -> case f str of
+  Right y -> x y
+  Left err -> Result (Left (show err)) str
 
 altL :: forall s a. Parser s a -> Parser s a -> Parser s a
 altL (Parser x) (Parser y) =
@@ -299,7 +309,7 @@ first :: forall f a. (f a -> Maybe { head :: a, tail :: f a }) -> Parser (f a) a
 first uncons = Parser \ str ->
   case uncons str of
        Just {head, tail} -> Result (Right head) tail
-       _ -> Result (Left "No more tokens to parse") str
+       _ -> Result (Left "Reached end of stream") str
 
 -- | ## Backtracking combinators
 

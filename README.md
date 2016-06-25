@@ -39,7 +39,7 @@ Left ("Predicate failed on `suchThat` when trying to parse the string \"cd\"..."
 Explicit left- and right-leaning versions of Control.Alt.alt (aka (<|>)):
 
 ```purescript
-vowels :: Parser Char
+vowels :: Parser String Char
 vowels = fail "Expected a, e, i, o, or u" |> do
   c <- item
   pure c |= (_ `elem` ['a', 'e', 'i', 'o', 'u'])
@@ -76,10 +76,10 @@ import Text.Parsing.Combinators as C
 
 data PositiveTupleInt = PositiveTupleInt Int Int
 
-parseTupleIntA :: Parser PositiveTupleInt
+parseTupleIntA :: Parser String PositiveTupleInt
 parseTupleIntA = PositiveTupleInt <$> (char '(' *> int |= (_ > 0) <* char ',') <*> (int |= (_ > 0) <* char ')')
 
-aprseTupleIntM :: Parser PositiveTupleInt
+aprseTupleIntM :: Parser String PositiveTupleInt
 parseTupleIntM = fail "Expected TupleInt of the form (x,y)" |> do
   char '('
   fst <- int `suchThat` (_ > 0)
