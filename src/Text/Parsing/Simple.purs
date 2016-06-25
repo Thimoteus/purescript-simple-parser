@@ -2,6 +2,7 @@ module Text.Parsing.Simple
   -- definitional exports
   ( Parser, ParseError, parse
   -- utility functions
+  , modify
   , altL, (<|)
   , altR, (|>)
   , applyL, (<<)
@@ -19,6 +20,7 @@ module Text.Parsing.Simple
   , skip
   , suchThat, (|=)
   , sepBy, sepBy1
+  , first
   -- non-polymorphic Parsers
   , item
   , sat, sat'
@@ -128,6 +130,9 @@ instance alternativeParser :: Alternative (Parser s)
 instance monadZeroParser :: Show s => MonadZero (Parser s)
 
 instance monadPlusParser :: Show s => MonadPlus (Parser s)
+
+modify :: forall s a. (s -> s) -> Parser s a -> Parser s a
+modify f (Parser x) = Parser \ str -> x (f str)
 
 altL :: forall s a. Parser s a -> Parser s a -> Parser s a
 altL (Parser x) (Parser y) =
@@ -289,6 +294,12 @@ item = Parser \ str ->
   case charAt 0 str of
        Just c -> Result (Right c) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
+
+first :: forall f a. (f a -> Maybe { head :: a, tail :: f a }) -> Parser (f a) a
+first uncons = Parser \ str ->
+  case uncons str of
+       Just {head, tail} -> Result (Right head) tail
+       _ -> Result (Left "No more tokens to parse") str
 
 -- | ## Backtracking combinators
 

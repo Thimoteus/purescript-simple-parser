@@ -47,7 +47,7 @@ instance showDate :: Show Date where
 dateString :: String
 dateString = "Jan 31, 2001"
 
-dateParser :: Parser Date
+dateParser :: Parser String Date
 dateParser = do
   month <- parseMonth
   space
@@ -57,7 +57,7 @@ dateParser = do
   year <- int
   pure $ Date year month day
     where
-    parseMonth :: Parser Month
+    parseMonth :: Parser String Month
     parseMonth = do
       m <- parseMonthStr
       pure case m of
@@ -74,7 +74,7 @@ dateParser = do
                 "Nov" -> Nov
                 _ -> Dec
 
-    parseMonthStr :: Parser String
+    parseMonthStr :: Parser String String
     parseMonthStr =
       choice [ string "Jan"
              , string "Feb"
@@ -101,43 +101,43 @@ instance showExpr :: Show Expr where
   show (List xs) = show xs
   show (Atom s) = s
 
-skipmany :: forall a. Parser a -> Parser Unit
+skipmany :: forall a. Parser String a -> Parser String Unit
 skipmany p = skipsome p <| pure unit
 
-skipsome :: forall a. Parser a -> Parser Unit
+skipsome :: forall a. Parser String a -> Parser String Unit
 skipsome p = do
   x <- p
   xs <- skipmany p
   pure unit
 
-singleComment :: Parser Unit
+singleComment :: Parser String Unit
 singleComment = do
   char ';'
   skipmany $ sat (_ /= '\n')
 
-simplespace :: Parser Unit
+simplespace :: Parser String Unit
 simplespace = skipsome $ sat \ c -> c == ' ' || c == '\n' || c == '\r' || c == '\t'
 
-spaces :: Parser Unit
+spaces :: Parser String Unit
 spaces = skipmany (simplespace <| singleComment)
 
-parseLit :: Parser Expr
+parseLit :: Parser String Expr
 parseLit = Lit <$> int
 
-parseAtom :: Parser Expr
+parseAtom :: Parser String Expr
 parseAtom = Atom <$> someChar alphanum
 
-parseList :: Parser Expr -> Parser Expr
+parseList :: Parser String Expr -> Parser String Expr
 parseList p = List <$> p `sepBy` whitespace
 
 testSexpr :: String
 testSexpr = "(add (mul (div 2 (add 9 9)) (sub 9 99)) 18)"
 
-expr :: Parser Expr
+expr :: Parser String Expr
 expr = fix f where
   f p = parseLit <| parseAtom <| bracket (char '(') (parseList p) (char ')')
 
-exprs :: Parser (List Expr)
+exprs :: Parser String (List Expr)
 exprs = do
   spaces
   expr `sepBy` whitespace
