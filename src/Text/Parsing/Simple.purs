@@ -3,6 +3,11 @@ module Text.Parsing.Simple
   ( Parser, ParseError, parse
   -- utility functions
   , modify, modifyM, modifyE
+  , object
+  , mapArrow, (|->)
+  , applyP, (~)
+  , bindP, (>>-)
+  , flippedBindP, (-<<)
   , altL, (<|)
   , altR, (|>)
   , applyL, (<<)
@@ -92,9 +97,7 @@ instance lazyParser :: Lazy (Parser s a) where
   defer f = Parser \ str -> runParser (f unit) str
 
 instance functorParser :: Functor (Parser s) where
-  map f (Parser p) = Parser \ str ->
-    let x = p str
-     in Result (f <$> consumed x) (remaining x)
+  map = mapArrow
 
 instance altParser :: Alt (Parser s) where
   alt = altL
@@ -103,25 +106,13 @@ instance plusParser :: Plus (Parser s) where
   empty = none
 
 instance applyParser :: Apply (Parser s) where
-  apply (Parser f) (Parser x) =
-    Parser \ str ->
-      let f' = f str
-          x' = x (remaining f')
-          con = consumed f' <*> consumed x'
-          rem = remaining x'
-       in Result con rem
+  apply = applyP
 
 instance applicativeParser :: Applicative (Parser s) where
-  pure x = Parser (Result (Right x))
+  pure = object
 
 instance bindParser :: Show s => Bind (Parser s) where
-  bind (Parser mx) mf = Parser \ str ->
-    let x = mx str
-     in case consumed x of
-             Right y -> runParser (mf y) (remaining x)
-             _ ->
-               let msg = "Parse failed at " <> take 5 (show str) <> "..."
-                in Result (Left msg) str
+  bind = bindP
 
 instance monadParser :: Show s => Monad (Parser s)
 
@@ -143,6 +134,63 @@ modifyE :: forall s err a. Show err => (s -> Either err s) -> Parser s a -> Pars
 modifyE f (Parser x) = Parser \ str -> case f str of
   Right y -> x y
   Left err -> Result (Left (show err)) str
+
+-- | A `pure` that doesn't require passing the typeclass dictionary for `Applicative`.
+object :: forall s a. a -> Parser s a
+object x = Parser (Result (Right x))
+
+-- | A `map` that doesn't require passing the typeclass dictionary for `Functor`.
+mapArrow :: forall s a b. (a -> b) -> Parser s a -> Parser s b
+mapArrow f (Parser p) = Parser \ str ->
+  let x = p str
+   in Result (f <$> consumed x) (remaining x)
+
+infixl 4 mapArrow as |->
+
+-- | An `apply` that doesn't require passing the typeclass dictionary for `Apply`.
+applyP :: forall s a b. Parser s (a -> b) -> Parser s a -> Parser s b
+applyP (Parser f) (Parser x) =
+  Parser \ str ->
+    let f' = f str
+        x' = x (remaining f')
+        con = consumed f' <*> consumed x'
+        rem = remaining x'
+     in Result con rem
+
+infixl 4 applyP as ~
+
+-- | A `bind` that doesn't require passing the typeclass dictionary for `Bind`.
+bindP :: forall s a b. Show s => Parser s a -> (a -> Parser s b) -> Parser s b
+bindP (Parser mx) mf = Parser \ str ->
+  let x = mx str
+   in case consumed x of
+           Right y -> runParser (mf y) (remaining x)
+           _ ->
+             let msg = "Parse failed at " <> take 5 (show str) <> "..."
+              in Result (Left msg) str
+
+infixl 1 bindP as >>-
+
+flippedBindP :: forall s a b. Show s => (a -> Parser s b) -> Parser s a -> Parser s b
+flippedBindP mf (Parser mx) = Parser \ str ->
+  let x = mx str
+   in case consumed x of
+           Right y -> runParser (mf y) (remaining x)
+           _ ->
+             let msg = "Parse failed at " <> take 5 (show str) <> "..."
+              in Result (Left msg) str
+
+infixr 1 flippedBindP as -<<
+
+composeKleisliParser :: forall s a b c. Show s => (b -> Parser s c) -> (a -> Parser s b) -> (a -> Parser s c)
+composeKleisliParser f g a = f -<< g a
+
+infixr 1 composeKleisliParser as <-<
+
+parserKleisliCompose :: forall s a b c. Show s => (a -> Parser s b) -> (b -> Parser s c) -> (a -> Parser s c)
+parserKleisliCompose f g a = f a >>- g
+
+infixr 1 parserKleisliCompose as >->
 
 altL :: forall s a. Parser s a -> Parser s a -> Parser s a
 altL (Parser x) (Parser y) =
@@ -780,6 +828,8 @@ integral = do
   first <- digit <| char '-'
   digits <- many digit
   pure $ fromCharList (first : digits)
+    where
+      bind = bindP
 
 -- | Parse an `Int`. Note that this parser will fail if the candidate would be
 -- | outside the range of allowable `Int`s.
@@ -789,6 +839,8 @@ int = do
   case fromString n of
        Just x -> pure x
        _ -> fail $ "Expected an int but found " <> show n
+  where
+    bind = bindP
 
 -- | Parse a `Number`. The string must have digits surrounding a decimal point.
 number :: Parser String Number
@@ -797,6 +849,8 @@ number = fail "Expected a number" |> do
   char '.'
   fracPart <- manyChar digit
   pure $ readFloat $ intPart <> "." <> fracPart
+    where
+    bind = bindP
 
 boolean :: Parser String Boolean
 boolean =

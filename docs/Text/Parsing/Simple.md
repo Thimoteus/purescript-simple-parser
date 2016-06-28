@@ -55,6 +55,68 @@ modifyM :: forall s a. (s -> Maybe s) -> Parser s a -> Parser s a
 modifyE :: forall s err a. Show err => (s -> Either err s) -> Parser s a -> Parser s a
 ```
 
+#### `object`
+
+``` purescript
+object :: forall s a. a -> Parser s a
+```
+
+A `pure` that doesn't require passing the typeclass dictionary for `Applicative`.
+
+#### `mapArrow`
+
+``` purescript
+mapArrow :: forall s a b. (a -> b) -> Parser s a -> Parser s b
+```
+
+A `map` that doesn't require passing the typeclass dictionary for `Functor`.
+
+#### `(|->)`
+
+``` purescript
+infixl 4 mapArrow as |->
+```
+
+#### `applyP`
+
+``` purescript
+applyP :: forall s a b. Parser s (a -> b) -> Parser s a -> Parser s b
+```
+
+An `apply` that doesn't require passing the typeclass dictionary for `Apply`.
+
+#### `(~)`
+
+``` purescript
+infixl 4 applyP as ~
+```
+
+#### `bindP`
+
+``` purescript
+bindP :: forall s a b. Show s => Parser s a -> (a -> Parser s b) -> Parser s b
+```
+
+A `bind` that doesn't require passing the typeclass dictionary for `Bind`.
+
+#### `(>>-)`
+
+``` purescript
+infixl 1 bindP as >>-
+```
+
+#### `flippedBindP`
+
+``` purescript
+flippedBindP :: forall s a b. Show s => (a -> Parser s b) -> Parser s a -> Parser s b
+```
+
+#### `(-<<)`
+
+``` purescript
+infixr 1 flippedBindP as -<<
+```
+
 #### `altL`
 
 ``` purescript
