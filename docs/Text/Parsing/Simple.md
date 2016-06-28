@@ -117,6 +117,30 @@ flippedBindP :: forall s a b. Show s => (a -> Parser s b) -> Parser s a -> Parse
 infixr 1 flippedBindP as -<<
 ```
 
+#### `composeKleisliParser`
+
+``` purescript
+composeKleisliParser :: forall s a b c. Show s => (b -> Parser s c) -> (a -> Parser s b) -> (a -> Parser s c)
+```
+
+#### `(<-<)`
+
+``` purescript
+infixr 1 composeKleisliParser as <-<
+```
+
+#### `parserKleisliCompose`
+
+``` purescript
+parserKleisliCompose :: forall s a b c. Show s => (a -> Parser s b) -> (b -> Parser s c) -> (a -> Parser s c)
+```
+
+#### `(>->)`
+
+``` purescript
+infixr 1 parserKleisliCompose as >->
+```
+
 #### `altL`
 
 ``` purescript

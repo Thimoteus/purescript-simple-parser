@@ -8,6 +8,8 @@ module Text.Parsing.Simple
   , applyP, (~)
   , bindP, (>>-)
   , flippedBindP, (-<<)
+  , composeKleisliParser, (<-<)
+  , parserKleisliCompose, (>->)
   , altL, (<|)
   , altR, (|>)
   , applyL, (<<)
