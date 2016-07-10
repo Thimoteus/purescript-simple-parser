@@ -36,7 +36,7 @@ Specialized versions of many typeclass functions, to avoid passing class diction
 
 | Typeclass function | Typeclassless version |
 | ------------------ | --------------------- |
-|      `<$>`         |        `\|->`         |
+|      `<$>`         |        `|->`          |
 |      `pure`        |       `pureP`         |
 |      `<*>`         |         `~`           |
 |       `*>`         |        `>>`           |
@@ -46,8 +46,8 @@ Specialized versions of many typeclass functions, to avoid passing class diction
 |      `=<<`         |        `-<<`          |
 |      `>=>`         |        `>->`          |
 |      `<=<`         |        `<-<`          |
-|      `<\|>`        |        `<\|`          |
-|    `flip alt`      |         `\|>`         |
+|      `<|>`         |        `<|`           |
+|    `flip alt`      |         `|>`          |
 
 Versions of common combinators optimized for speed,
 including a fast stack-safe implementation of `many`:
