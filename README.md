@@ -1,10 +1,6 @@
 # purescript-simple-parser [![Build Status](https://travis-ci.org/Thimoteus/purescript-simple-parser.svg?branch=master)](https://travis-ci.org/Thimoteus/purescript-simple-parser)
 
-A parsing combinator library with a simple definition. You may prefer
-[purescript-string-parsers](https://github.com/paf31/purescript-string-parsers)
-if you make heavy use of backtracking, or
-[purescript-parsing](https://github.com/purescript-contrib/purescript-parsing)
-if your input isn't necessarily a string.
+A parsing combinator library with a simple definition.
 
 ## Features
 
@@ -36,14 +32,22 @@ Brand-new combinators (such as `atLeast`, `atMost`, `exactly`, `suchThat`):
 Left ("Predicate failed on `suchThat` when trying to parse the string \"cd\"...")
 ```
 
-Explicit left- and right-leaning versions of Control.Alt.alt (aka (<|>)):
+Specialized versions of many typeclass functions, to avoid passing class dictionaries:
 
-```purescript
-vowels :: Parser String Char
-vowels = fail "Expected a, e, i, o, or u" |> do
-  c <- item
-  pure c |= (_ `elem` ['a', 'e', 'i', 'o', 'u'])
-```
+| Typeclass function | Typeclassless version |
+| ------------------ | --------------------- |
+|      `<$>`         |        `\|->`         |
+|      `pure`        |       `pureP`         |
+|      `<*>`         |         `~`           |
+|       `*>`         |        `>>`           |
+|      `<*`          |        `<<`           |
+|     `bind`         |        `bindP`        |
+|      `>>=`         |        `>>-`          |
+|      `=<<`         |        `-<<`          |
+|      `>=>`         |        `>->`          |
+|      `<=<`         |        `<-<`          |
+|      `<\|>`        |        `<\|`          |
+|    `flip alt`      |         `\|>`         |
 
 Versions of common combinators optimized for speed,
 including a fast stack-safe implementation of `many`:

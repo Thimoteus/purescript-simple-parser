@@ -22,11 +22,11 @@ Alt (Parser s)
 Plus (Parser s)
 Apply (Parser s)
 Applicative (Parser s)
-(Show s) => Bind (Parser s)
-(Show s) => Monad (Parser s)
+Bind (Parser s)
+Monad (Parser s)
 Alternative (Parser s)
-(Show s) => MonadZero (Parser s)
-(Show s) => MonadPlus (Parser s)
+MonadZero (Parser s)
+MonadPlus (Parser s)
 ```
 
 #### `parse`
@@ -37,11 +37,21 @@ parse :: forall s a. Parser s a -> s -> Either ParseError a
 
 Run a parser against an input, either getting an error or a value.
 
+#### `unparser`
+
+``` purescript
+unparser :: forall s a. Parser s a -> s -> { consumed :: Either ParseError a, remaining :: s }
+```
+
+Get the result of a parse, plus the unparsed input remainder.
+
 #### `modify`
 
 ``` purescript
 modify :: forall s a. (s -> s) -> Parser s a -> Parser s a
 ```
+
+Change the input to a parser.
 
 #### `modifyM`
 
@@ -49,24 +59,28 @@ modify :: forall s a. (s -> s) -> Parser s a -> Parser s a
 modifyM :: forall s a. (s -> Maybe s) -> Parser s a -> Parser s a
 ```
 
+Change the input to a parser, using `Nothing` to signal failure.
+
 #### `modifyE`
 
 ``` purescript
 modifyE :: forall s err a. Show err => (s -> Either err s) -> Parser s a -> Parser s a
 ```
 
-#### `object`
+Change the input to a parser, using `Left` to signal failure.
+
+#### `pureP`
 
 ``` purescript
-object :: forall s a. a -> Parser s a
+pureP :: forall s a. a -> Parser s a
 ```
 
 A `pure` that doesn't require passing the typeclass dictionary for `Applicative`.
 
-#### `mapArrow`
+#### `mapP`
 
 ``` purescript
-mapArrow :: forall s a b. (a -> b) -> Parser s a -> Parser s b
+mapP :: forall s a b. (a -> b) -> Parser s a -> Parser s b
 ```
 
 A `map` that doesn't require passing the typeclass dictionary for `Functor`.
@@ -74,7 +88,7 @@ A `map` that doesn't require passing the typeclass dictionary for `Functor`.
 #### `(|->)`
 
 ``` purescript
-infixl 4 mapArrow as |->
+infixl 4 mapP as |->
 ```
 
 #### `applyP`
@@ -94,7 +108,7 @@ infixl 4 applyP as ~
 #### `bindP`
 
 ``` purescript
-bindP :: forall s a b. Show s => Parser s a -> (a -> Parser s b) -> Parser s b
+bindP :: forall s a b. Parser s a -> (a -> Parser s b) -> Parser s b
 ```
 
 A `bind` that doesn't require passing the typeclass dictionary for `Bind`.
@@ -108,7 +122,7 @@ infixl 1 bindP as >>-
 #### `flippedBindP`
 
 ``` purescript
-flippedBindP :: forall s a b. Show s => (a -> Parser s b) -> Parser s a -> Parser s b
+flippedBindP :: forall s a b. (a -> Parser s b) -> Parser s a -> Parser s b
 ```
 
 #### `(-<<)`
@@ -120,7 +134,7 @@ infixr 1 flippedBindP as -<<
 #### `composeKleisliParser`
 
 ``` purescript
-composeKleisliParser :: forall s a b c. Show s => (b -> Parser s c) -> (a -> Parser s b) -> (a -> Parser s c)
+composeKleisliParser :: forall s a b c. (b -> Parser s c) -> (a -> Parser s b) -> (a -> Parser s c)
 ```
 
 #### `(<-<)`
@@ -132,7 +146,7 @@ infixr 1 composeKleisliParser as <-<
 #### `parserKleisliCompose`
 
 ``` purescript
-parserKleisliCompose :: forall s a b c. Show s => (a -> Parser s b) -> (b -> Parser s c) -> (a -> Parser s c)
+parserKleisliCompose :: forall s a b c. (a -> Parser s b) -> (b -> Parser s c) -> (a -> Parser s c)
 ```
 
 #### `(>->)`
@@ -344,8 +358,10 @@ Parse a single `Char`.
 #### `first`
 
 ``` purescript
-first :: forall f a. (f a -> Maybe { head :: a, tail :: f a }) -> Parser (f a) a
+first :: forall s a. (s -> Maybe { head :: a, tail :: s }) -> Parser s a
 ```
+
+A generalized `item` for arbitrary streams that can be `uncons`ed.
 
 #### `sat`
 

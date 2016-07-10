@@ -1,10 +1,10 @@
 module Text.Parsing.Simple
   -- definitional exports
-  ( Parser, ParseError, parse
+  ( Parser, ParseError, parse, unparser
   -- utility functions
   , modify, modifyM, modifyE
-  , object
-  , mapArrow, (|->)
+  , pureP
+  , mapP, (|->)
   , applyP, (~)
   , bindP, (>>-)
   , flippedBindP, (-<<)
@@ -19,7 +19,7 @@ module Text.Parsing.Simple
   , none
   , fail, orFailWith, (<?>)
   , try
-  , many , some
+  , many, some
   , fix
   , lookahead
   , isn't
@@ -85,6 +85,12 @@ runParser (Parser x) = x
 parse :: forall s a. Parser s a -> s -> Either ParseError a
 parse (Parser p) = consumed <<< p
 
+-- | Get the result of a parse, plus the unparsed input remainder.
+unparser :: forall s a. Parser s a -> s -> { consumed :: Either ParseError a, remaining :: s }
+unparser (Parser p) s =
+  let result = p s
+   in {consumed: consumed result, remaining: remaining result}
+
 instance semigroupParser :: Semigroup (Parser s a) where
   append (Parser x) (Parser y) = Parser \ str ->
     let z = x str
@@ -99,7 +105,7 @@ instance lazyParser :: Lazy (Parser s a) where
   defer f = Parser \ str -> runParser (f unit) str
 
 instance functorParser :: Functor (Parser s) where
-  map = mapArrow
+  map = mapP
 
 instance altParser :: Alt (Parser s) where
   alt = altL
@@ -111,43 +117,46 @@ instance applyParser :: Apply (Parser s) where
   apply = applyP
 
 instance applicativeParser :: Applicative (Parser s) where
-  pure = object
+  pure = pureP
 
-instance bindParser :: Show s => Bind (Parser s) where
+instance bindParser :: Bind (Parser s) where
   bind = bindP
 
-instance monadParser :: Show s => Monad (Parser s)
+instance monadParser :: Monad (Parser s)
 
 instance alternativeParser :: Alternative (Parser s)
 
-instance monadZeroParser :: Show s => MonadZero (Parser s)
+instance monadZeroParser :: MonadZero (Parser s)
 
-instance monadPlusParser :: Show s => MonadPlus (Parser s)
+instance monadPlusParser :: MonadPlus (Parser s)
 
+-- | Change the input to a parser.
 modify :: forall s a. (s -> s) -> Parser s a -> Parser s a
-modify f (Parser x) = Parser \ str -> x (f str)
+modify f (Parser x) = Parser (x <<< f)
 
+-- | Change the input to a parser, using `Nothing` to signal failure.
 modifyM :: forall s a. (s -> Maybe s) -> Parser s a -> Parser s a
 modifyM f (Parser x) = Parser \ str -> case f str of
   Just y -> x y
   _ -> Result (Left "Encountered `Nothing` in `modifyM`") str
 
+-- | Change the input to a parser, using `Left` to signal failure.
 modifyE :: forall s err a. Show err => (s -> Either err s) -> Parser s a -> Parser s a
 modifyE f (Parser x) = Parser \ str -> case f str of
   Right y -> x y
   Left err -> Result (Left (show err)) str
 
 -- | A `pure` that doesn't require passing the typeclass dictionary for `Applicative`.
-object :: forall s a. a -> Parser s a
-object x = Parser (Result (Right x))
+pureP :: forall s a. a -> Parser s a
+pureP x = Parser (Result (Right x))
 
 -- | A `map` that doesn't require passing the typeclass dictionary for `Functor`.
-mapArrow :: forall s a b. (a -> b) -> Parser s a -> Parser s b
-mapArrow f (Parser p) = Parser \ str ->
+mapP :: forall s a b. (a -> b) -> Parser s a -> Parser s b
+mapP f (Parser p) = Parser \ str ->
   let x = p str
    in Result (f <$> consumed x) (remaining x)
 
-infixl 4 mapArrow as |->
+infixl 4 mapP as |->
 
 -- | An `apply` that doesn't require passing the typeclass dictionary for `Apply`.
 applyP :: forall s a b. Parser s (a -> b) -> Parser s a -> Parser s b
@@ -162,34 +171,30 @@ applyP (Parser f) (Parser x) =
 infixl 4 applyP as ~
 
 -- | A `bind` that doesn't require passing the typeclass dictionary for `Bind`.
-bindP :: forall s a b. Show s => Parser s a -> (a -> Parser s b) -> Parser s b
+bindP :: forall s a b. Parser s a -> (a -> Parser s b) -> Parser s b
 bindP (Parser mx) mf = Parser \ str ->
   let x = mx str
    in case consumed x of
            Right y -> runParser (mf y) (remaining x)
-           _ ->
-             let msg = "Parse failed at " <> take 5 (show str) <> "..."
-              in Result (Left msg) str
+           Left msg -> Result (Left msg) str
 
 infixl 1 bindP as >>-
 
-flippedBindP :: forall s a b. Show s => (a -> Parser s b) -> Parser s a -> Parser s b
+flippedBindP :: forall s a b. (a -> Parser s b) -> Parser s a -> Parser s b
 flippedBindP mf (Parser mx) = Parser \ str ->
   let x = mx str
    in case consumed x of
            Right y -> runParser (mf y) (remaining x)
-           _ ->
-             let msg = "Parse failed at " <> take 5 (show str) <> "..."
-              in Result (Left msg) str
+           Left msg -> Result (Left msg) str
 
 infixr 1 flippedBindP as -<<
 
-composeKleisliParser :: forall s a b c. Show s => (b -> Parser s c) -> (a -> Parser s b) -> (a -> Parser s c)
+composeKleisliParser :: forall s a b c. (b -> Parser s c) -> (a -> Parser s b) -> (a -> Parser s c)
 composeKleisliParser f g a = f -<< g a
 
 infixr 1 composeKleisliParser as <-<
 
-parserKleisliCompose :: forall s a b c. Show s => (a -> Parser s b) -> (b -> Parser s c) -> (a -> Parser s c)
+parserKleisliCompose :: forall s a b c. (a -> Parser s b) -> (b -> Parser s c) -> (a -> Parser s c)
 parserKleisliCompose f g a = f a >>- g
 
 infixr 1 parserKleisliCompose as >->
@@ -281,7 +286,7 @@ many p = Parser \ str -> go str p Nil
 
 -- | Attempt a parse one or more times.
 some :: forall s a. Parser s a -> Parser s (List a)
-some p = Cons <$> p <*> many p
+some p = Cons |-> p ~ many p
 
 -- | Find a function's least fixed point using the Z combinator.
 fix :: forall s a. (Parser s a -> Parser s a) -> Parser s a
@@ -300,7 +305,7 @@ isn't (Parser x) = Parser \ str ->
    in case consumed parsed of
            Right _ ->
              let msg = "Parse failed on `isn't` when trying to parse "
-                    <> take 5 (show str)
+                    <> take 20 (show str)
                     <> "..."
               in Result (Left msg) rem
            _ -> Result (Right unit) rem
@@ -311,7 +316,7 @@ notFollowedBy (Parser x) =
   Parser \ str -> case consumed (x str) of
     Right _ ->
       let msg = "Parse failed on `notFollowedBy` when trying to parse "
-             <> take 5 (show str)
+             <> take 20 (show str)
              <> "..."
        in Result (Left msg) str
     _ -> Result (Right unit) str
@@ -331,7 +336,7 @@ suchThat (Parser p) f = Parser \ str ->
              if f res
                 then parsed
                 else let msg = "Predicate failed on `suchThat` when trying to parse "
-                            <> take 5 (show str)
+                            <> take 20 (show str)
                             <> "..."
                       in Result (Left msg) (remaining parsed)
            _ -> Result (Left "Parse failed on `suchThat`") str
@@ -342,7 +347,7 @@ sepBy :: forall s a b. Parser s a -> Parser s b -> Parser s (List a)
 sepBy target separator = sepBy1 target separator <| pure Nil
 
 sepBy1 :: forall s a b. Parser s a -> Parser s b -> Parser s (List a)
-sepBy1 target separator = Cons <$> target <*> many (separator >> target)
+sepBy1 target separator = Cons |-> target ~ many (separator >> target)
 
 -- | Matches the unparsed portion of the input.
 tail :: Parser String String
@@ -355,10 +360,11 @@ item = Parser \ str ->
        Just c -> Result (Right c) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
-first :: forall f a. (f a -> Maybe { head :: a, tail :: f a }) -> Parser (f a) a
+-- | A generalized `item` for arbitrary streams that can be `uncons`ed.
+first :: forall s a. (s -> Maybe { head :: a, tail :: s }) -> Parser s a
 first uncons = Parser \ str ->
   case uncons str of
-       Just {head, tail} -> Result (Right head) tail
+       Just o -> Result (Right o.head) o.tail
        _ -> Result (Left "Reached end of stream") str
 
 -- | ## Backtracking combinators
@@ -373,7 +379,7 @@ sat f = Parser \ str ->
             else let msg = "Character "
                         <> show c
                         <> " did not satisfy predicate when trying to parse the string "
-                        <> show (take 5 str)
+                        <> show (take 20 str)
                         <> "..."
                   in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -393,7 +399,7 @@ isn'tAny s = Parser \ str ->
                                 <> " but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
                     else Result (Right c) (drop 1 str)
@@ -415,7 +421,7 @@ anyOf s = Parser \ str ->
                                 <> " but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -430,7 +436,7 @@ char x = Parser \ str ->
                                 <> " but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -453,7 +459,7 @@ digit = Parser \ str ->
                     else let msg = "Expected a digit but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -467,7 +473,7 @@ lower = Parser \ str ->
                     else let msg = "Expected a lowercase character but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -481,7 +487,7 @@ upper = Parser \ str ->
                     else let msg = "Expected an uppercase character but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -494,7 +500,7 @@ letter = Parser \ str ->
                     else let msg = "Expected a letter but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -508,7 +514,7 @@ alphanum = Parser \ str ->
                     else let msg = "Expected alphanumeric character but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -521,7 +527,7 @@ space = Parser \ str ->
                     else let msg = "Expected a space but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -534,7 +540,7 @@ tab = Parser \ str ->
                     else let msg = "Expected a tab but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -547,7 +553,7 @@ newline = Parser \ str ->
                     else let msg = "Expected a newline but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -561,7 +567,7 @@ cr = Parser \ str ->
                     else let msg = "Expected carriage return but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -574,7 +580,7 @@ whitespace = Parser \ str ->
                     else let msg = "Expected whitespace but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
@@ -590,7 +596,7 @@ sat' f = Parser \ str ->
             else let msg = "Character "
                         <> show c
                         <> " did not satisfy predicate when trying to parse the string "
-                        <> show (take 5 str)
+                        <> show (take 20 str)
                         <> "..."
                   in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -607,7 +613,7 @@ isn'tAny' s = Parser \ str ->
                                 <> " but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
                     else Result (Right c) (drop 1 str)
@@ -626,7 +632,7 @@ anyOf' s = Parser \ str ->
                                 <> " but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -641,7 +647,7 @@ char' x = Parser \ str ->
                                 <> " but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -664,7 +670,7 @@ digit' = Parser \ str ->
                     else let msg = "Expected a digit but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -677,7 +683,7 @@ lower' = Parser \ str ->
                     else let msg = "Expected a lowercase character but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -690,7 +696,7 @@ upper' = Parser \ str ->
                     else let msg = "Expected an uppercase character but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -703,7 +709,7 @@ letter' = Parser \ str ->
                     else let msg = "Expected a letter but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -716,7 +722,7 @@ alphanum' = Parser \ str ->
                     else let msg = "Expected alphanumeric character but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -729,7 +735,7 @@ space' = Parser \ str ->
                     else let msg = "Expected a space but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -742,7 +748,7 @@ tab' = Parser \ str ->
                     else let msg = "Expected a tab but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -755,7 +761,7 @@ newline' = Parser \ str ->
                     else let msg = "Expected a newline but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -768,7 +774,7 @@ cr' = Parser \ str ->
                     else let msg = "Expected carriage return but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -781,7 +787,7 @@ whitespace' = Parser \ str ->
                     else let msg = "Expected whitespace but found "
                                 <> show c
                                 <> " when trying to parse the string "
-                                <> show (take 5 str)
+                                <> show (take 20 str)
                                 <> "..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -797,12 +803,12 @@ skipSpaces = skip whitespaces
 -- | Parse a natural number amount of a given `Char` parser, resulting in a
 -- | `String`.
 manyChar :: Parser String Char -> Parser String String
-manyChar p = fromCharList <$> many p
+manyChar p = fromCharList |-> many p
 
 -- | Parse a positive integral amount of a given `Char` parser, resulting in a
 -- | `String`.
 someChar :: Parser String Char -> Parser String String
-someChar p = fromCharList <$> some p
+someChar p = fromCharList |-> some p
 
 -- | Contiguous strings with no tabs, spaces, carriage returns or newlines.
 word :: Parser String String
@@ -818,7 +824,7 @@ eof = Parser \ str ->
          let msg = "Expected empty string but found "
                 <> show other
                 <> " when trying to parse the string "
-                <> show (take 5 str)
+                <> show (take 20 str)
                 <> "..."
           in Result (Left msg) str
 
@@ -827,9 +833,9 @@ eof = Parser \ str ->
 -- | `purescript-hugenum`'s `Data.HugeInt.fromString`.
 integral :: Parser String String
 integral = do
-  first <- digit <| char '-'
+  firstChar <- digit <| char '-'
   digits <- many digit
-  pure $ fromCharList (first : digits)
+  pure $ fromCharList (firstChar : digits)
     where
       bind = bindP
 
