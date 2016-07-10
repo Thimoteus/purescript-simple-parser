@@ -62,6 +62,70 @@ Right ('asjdf89...
 RangeError: Maximum call stack size exceeded
 ```
 
+Polymorphism in the input type:
+
+```purescript
+data Token = LParen | RParen | Digits Int | Comma
+
+type Lexer a = Parser String a
+
+lparen :: Lexer Token
+lparen = LParen <$ (char '(' << skipSpaces)
+
+rparen :: Lexer Token
+rparen = RParen <$ (char ')' << skipSpaces)
+
+comma :: Lexer Token
+comma = Comma <$ (char ',' << skipSpaces)
+
+digits :: Lexer Token
+digits = Digit |-> (int << skipSpaces)
+
+lex :: String -> Either ParseError (List Token)
+lex = parse
+
+type P a = Parser (List Token) a
+
+popToken :: forall a. P a
+popToken = first List.uncons
+
+data Expr = Integer Int | Pair Expr Expr
+
+integer :: P Expr
+integer = popToken >>- case _ of
+  Digits n -> pure (Integer n)
+  t -> fail ("Expected digits but found " <> show t)
+
+open :: P Unit
+open = popToken >>- case _ of
+  LParen -> pure unit
+  t -> fail ("Expected '(' but found " <> show t)
+
+close :: P Unit
+close = popToken >>- case _ of
+  RParen -> pure unit
+  t -> fail ("Expected ')' but found " <> show t)
+
+sep :: P Unit
+sep = popToken >>- case _ of
+  Comma -> pure unit
+  t -> fail ("Expected ',' but found " <> show t)
+
+simplePair :: P Expr
+simplePair = do
+  open
+  d1 <- integer
+  sep
+  d2 <- integer
+  close
+  case d1, d2 of
+    Integer n, Integer m -> pure (Tuple n m)
+    x, y -> fail ("Expected integers but found " <> show x <> ", " <> show y)
+
+runParser :: String -> Either ParseError Expr
+runParser = parse simplePair <=< lex
+```
+
 ## Usage
 
 The module `Text.Parsing.Combinators` includes general combinators for use with
