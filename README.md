@@ -82,7 +82,9 @@ digits :: Lexer Token
 digits = Digit |-> (int << skipSpaces)
 
 lex :: String -> Either ParseError (List Token)
-lex = parse
+lex = parse (many token)
+  where
+  token = lparen <| rparen <| comma <| digits
 
 type P a = Parser (List Token) a
 
