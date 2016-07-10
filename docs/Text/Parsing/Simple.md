@@ -289,16 +289,16 @@ Parse without consuming input.
 #### `isn't`
 
 ``` purescript
-isn't :: forall s a. Show s => Parser s a -> Parser s Unit
+isn't :: forall s a. Parser s a -> Parser s Unit
 ```
 
 `isn't p` succeeds iff p fails, though it will always consume the same
-amount of string that p does.
+amount of input that p does.
 
 #### `notFollowedBy`
 
 ``` purescript
-notFollowedBy :: forall s a. Show s => Parser s a -> Parser s Unit
+notFollowedBy :: forall s a. Parser s a -> Parser s Unit
 ```
 
 Differs from `isn't` in that this never consumes input.
@@ -314,7 +314,7 @@ Discard the result of a parse.
 #### `suchThat`
 
 ``` purescript
-suchThat :: forall s a. Show s => Parser s a -> (a -> Boolean) -> Parser s a
+suchThat :: forall s a. Parser s a -> (a -> Boolean) -> Parser s a
 ```
 
 Attempt a parse subject to a predicate. If the parse succeeds but the

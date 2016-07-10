@@ -297,27 +297,23 @@ lookahead :: forall s a. Parser s a -> Parser s a
 lookahead (Parser x) = Parser \ str -> (Result $ consumed $ x str) str
 
 -- | `isn't p` succeeds iff p fails, though it will always consume the same
--- | amount of string that p does.
-isn't :: forall s a. Show s => Parser s a -> Parser s Unit
+-- | amount of input that p does.
+isn't :: forall s a. Parser s a -> Parser s Unit
 isn't (Parser x) = Parser \ str ->
   let parsed = x str
       rem = remaining parsed
    in case consumed parsed of
            Right _ ->
-             let msg = "Parse failed on `isn't` when trying to parse "
-                    <> take 20 (show str)
-                    <> "..."
+             let msg = "Parse failed on `isn't`"
               in Result (Left msg) rem
            _ -> Result (Right unit) rem
 
 -- | Differs from `isn't` in that this never consumes input.
-notFollowedBy :: forall s a. Show s => Parser s a -> Parser s Unit
+notFollowedBy :: forall s a. Parser s a -> Parser s Unit
 notFollowedBy (Parser x) =
   Parser \ str -> case consumed (x str) of
     Right _ ->
-      let msg = "Parse failed on `notFollowedBy` when trying to parse "
-             <> take 20 (show str)
-             <> "..."
+      let msg = "Parse failed on `notFollowedBy`"
        in Result (Left msg) str
     _ -> Result (Right unit) str
 
@@ -328,18 +324,16 @@ skip (Parser p) = Parser \ str -> Result (Right unit) (remaining $ p str)
 -- | Attempt a parse subject to a predicate. If the parse succeeds but the
 -- | predicate does not hold, the resulting parse fails *without* backtracking.
 -- | If the parse fails, it will backtrack.
-suchThat :: forall s a. Show s => Parser s a -> (a -> Boolean) -> Parser s a
+suchThat :: forall s a. Parser s a -> (a -> Boolean) -> Parser s a
 suchThat (Parser p) f = Parser \ str ->
   let parsed = p str
    in case consumed parsed of
            Right res ->
              if f res
                 then parsed
-                else let msg = "Predicate failed on `suchThat` when trying to parse "
-                            <> take 20 (show str)
-                            <> "..."
+                else let msg = "Predicate failed on `suchThat`"
                       in Result (Left msg) (remaining parsed)
-           _ -> Result (Left "Parse failed on `suchThat`") str
+           Left err -> Result (Left err) str
 
 infixl 5 suchThat as |=
 
@@ -380,7 +374,7 @@ sat f = Parser \ str ->
                         <> show c
                         <> " did not satisfy predicate when trying to parse the string "
                         <> show (take 20 str)
-                        <> "..."
+                        <> " ..."
                   in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -400,7 +394,7 @@ isn'tAny s = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
                     else Result (Right c) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -422,7 +416,7 @@ anyOf s = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -437,7 +431,7 @@ char x = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -460,7 +454,7 @@ digit = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -474,7 +468,7 @@ lower = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -488,7 +482,7 @@ upper = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -501,7 +495,7 @@ letter = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -515,7 +509,7 @@ alphanum = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -528,7 +522,7 @@ space = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -541,7 +535,7 @@ tab = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -554,7 +548,7 @@ newline = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -568,7 +562,7 @@ cr = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -581,7 +575,7 @@ whitespace = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) str
        _ -> Result (Left "Reached end of file") str
 
@@ -597,7 +591,7 @@ sat' f = Parser \ str ->
                         <> show c
                         <> " did not satisfy predicate when trying to parse the string "
                         <> show (take 20 str)
-                        <> "..."
+                        <> " ..."
                   in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -614,7 +608,7 @@ isn'tAny' s = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
                     else Result (Right c) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
@@ -633,7 +627,7 @@ anyOf' s = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -648,7 +642,7 @@ char' x = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -671,7 +665,7 @@ digit' = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -684,7 +678,7 @@ lower' = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -697,7 +691,7 @@ upper' = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -710,7 +704,7 @@ letter' = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -723,7 +717,7 @@ alphanum' = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -736,7 +730,7 @@ space' = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -749,7 +743,7 @@ tab' = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -762,7 +756,7 @@ newline' = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -775,7 +769,7 @@ cr' = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -788,7 +782,7 @@ whitespace' = Parser \ str ->
                                 <> show c
                                 <> " when trying to parse the string "
                                 <> show (take 20 str)
-                                <> "..."
+                                <> " ..."
                           in Result (Left msg) (drop 1 str)
        _ -> Result (Left "Reached end of file") str
 
@@ -825,7 +819,7 @@ eof = Parser \ str ->
                 <> show other
                 <> " when trying to parse the string "
                 <> show (take 20 str)
-                <> "..."
+                <> " ..."
           in Result (Left msg) str
 
 -- | Parse an integer value as a `String`. Useful if needing to parse integers
