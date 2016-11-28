@@ -1,11 +1,13 @@
 module Test.Main where
 
-import Prelude
 import Text.Parsing.Simple
-import Text.Parsing.Combinators (choice, bracket)
-import Control.Monad.Eff.Console (logShow)
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Console (CONSOLE, logShow)
 import Data.List (List)
+import Prelude (class Show, Unit, bind, unit, pure, show, (<$>), (==), (||), ($), (/=), (<>))
+import Text.Parsing.Combinators (choice, bracket)
 
+main :: forall a. Eff ( console :: CONSOLE | a) Unit
 main = do
   logShow $ parse dateParser dateString
   logShow $ parse exprs testSexpr

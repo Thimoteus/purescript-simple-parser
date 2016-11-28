@@ -1,7 +1,7 @@
 {
   "name": "purescript-simple-parser",
   "description": "A simple parsing library",
-  "version": "6.0.1",
+  "version": "7.0.0",
   "keywords": [
     "purescript"
   ],
@@ -23,17 +23,17 @@
     "url": "git://github.com/Thimoteus/purescript-simple-parser.git"
   },
   "dependencies": {
-    "purescript-control": "^1.0.0",
-    "purescript-maybe": "^1.0.0",
-    "purescript-strings": "^1.0.0",
-    "purescript-foldable-traversable": "^1.0.0",
-    "purescript-globals": "^1.0.0",
-    "purescript-lists": "^1.0.1",
-    "purescript-integers": "^1.0.0",
-    "purescript-either": "^1.0.0"
+    "purescript-control": "^2.0.0",
+    "purescript-maybe": "^2.0.1",
+    "purescript-strings": "^2.0.2",
+    "purescript-foldable-traversable": "^2.0.0",
+    "purescript-globals": "^2.0.0",
+    "purescript-lists": "^3.2.0",
+    "purescript-integers": "^2.0.0",
+    "purescript-either": "^2.0.0"
   },
   "devDependencies": {
-    "purescript-console": "^1.0.0",
-    "purescript-psci-support": "^1.0.0"
+    "purescript-console": "^2.0.0",
+    "purescript-psci-support": "^2.0.0"
   }
 }
