@@ -845,7 +845,7 @@ int = do
 number :: Parser String Number
 number = fail "Expected a number" |> do
   intPart <- integral
-  char '.'
+  void $ char '.'
   fracPart <- manyChar digit
   pure $ readFloat $ intPart <> "." <> fracPart
     where
