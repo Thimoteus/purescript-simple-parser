@@ -1,11 +1,13 @@
 module Test.Main where
 
-import Prelude
 import Text.Parsing.Simple
-import Text.Parsing.Combinators (choice, bracket)
-import Control.Monad.Eff.Console (logShow)
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Console (CONSOLE, logShow)
 import Data.List (List)
+import Prelude (class Show, Unit, bind, unit, pure, show, (<$>), (==), (||), ($), (/=), (<>), (*>), discard, void)
+import Text.Parsing.Combinators (choice, bracket)
 
+main :: forall a. Eff ( console :: CONSOLE | a) Unit
 main = do
   logShow $ parse dateParser dateString
   logShow $ parse exprs testSexpr
@@ -50,10 +52,10 @@ dateString = "Jan 31, 2001"
 dateParser :: Parser String Date
 dateParser = do
   month <- parseMonth
-  space
+  void space
   day <- int
-  char ','
-  space
+  void (char ',')
+  void (space)
   year <- int
   pure $ Date year month day
     where
@@ -112,8 +114,7 @@ skipsome p = do
 
 singleComment :: Parser String Unit
 singleComment = do
-  char ';'
-  skipmany $ sat (_ /= '\n')
+  char ';' *> skipmany (sat (_ /= '\n'))
 
 simplespace :: Parser String Unit
 simplespace = skipsome $ sat \ c -> c == ' ' || c == '\n' || c == '\r' || c == '\t'
@@ -138,6 +139,5 @@ expr = fix f where
   f p = parseLit <| parseAtom <| bracket (char '(') (parseList p) (char ')')
 
 exprs :: Parser String (List Expr)
-exprs = do
-  spaces
-  expr `sepBy` whitespace
+exprs =
+  spaces *> (expr `sepBy` whitespace)
