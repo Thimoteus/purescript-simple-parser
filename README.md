@@ -169,5 +169,5 @@ Also see the [test](test/) folder.
     bower i purescript-simple-parser
 
 ## Documentation
-- [On Github](docs/Text/Parsing/)
+- [On Github](generated-docs/Text/Parsing/)
 - [On Pursuit](https://pursuit.purescript.org/packages/purescript-simple-parser/)

@@ -46,23 +46,21 @@ module Text.Parsing.Simple
   ) where
 
 import Prelude
-import Global (readFloat)
 
 import Control.Alt (class Alt)
-import Control.Plus (class Plus)
 import Control.Alternative (class Alternative)
-import Control.MonadZero (class MonadZero)
-import Control.MonadPlus (class MonadPlus)
 import Control.Lazy (class Lazy)
-
-import Data.Monoid (class Monoid)
-import Data.Maybe (Maybe(Just))
+import Control.MonadPlus (class MonadPlus)
+import Control.MonadZero (class MonadZero)
+import Control.Plus (class Plus)
 import Data.Either (Either(..))
 import Data.Foldable (class Foldable, foldMap, notElem, elem)
-import Data.String (singleton, indexOf, drop, length, charAt, contains, take)
-import Data.List (List(..), (:), reverse)
 import Data.Int (fromString)
-import Data.Functor ((<$))
+import Data.List (List(..), (:), reverse)
+import Data.Maybe (Maybe(Just))
+import Data.Monoid (class Monoid)
+import Data.String (Pattern(..), charAt, contains, drop, indexOf, length, singleton, take)
+import Global (readFloat)
 
 type ParseError = String
 
@@ -387,7 +385,7 @@ isn'tAnyF xs = sat (_ `notElem` xs)
 isn'tAny :: String -> Parser String Char
 isn'tAny s = Parser \ str ->
   case charAt 0 str of
-       Just c -> if contains (singleton c) s
+       Just c -> if contains (Pattern (singleton c)) s
                     then let msg = "Expecting none of "
                                 <> show s
                                 <> " but found "
@@ -408,7 +406,7 @@ anyOfF xs = sat (_ `elem` xs)
 anyOf :: String -> Parser String Char
 anyOf s = Parser \ str ->
   case charAt 0 str of
-       Just c -> if contains (singleton c) s
+       Just c -> if contains (Pattern (singleton c)) s
                     then Result (Right c) (drop 1 str)
                     else let msg = "Expected one of "
                                 <> show s
@@ -437,7 +435,7 @@ char x = Parser \ str ->
 
 string :: String -> Parser String String
 string s = Parser \ str ->
-  case indexOf s str of
+  case indexOf (Pattern s) str of
        Just 0 -> Result (Right s) (drop (length s) str)
        _ -> let msg = "Expecting "
                    <> show s
@@ -601,7 +599,7 @@ isn'tAnyF' xs = sat' (_ `notElem` xs)
 isn'tAny' :: String -> Parser String Char
 isn'tAny' s = Parser \ str ->
   case charAt 0 str of
-       Just c -> if contains (singleton c) s
+       Just c -> if contains (Pattern (singleton c)) s
                     then let msg = "Expecting none of "
                                 <> show s
                                 <> " but found "
@@ -619,7 +617,7 @@ anyOfF' xs = sat' (_ `elem` xs)
 anyOf' :: String -> Parser String Char
 anyOf' s = Parser \ str ->
   case charAt 0 str of
-       Just c -> if contains (singleton c) s
+       Just c -> if contains (Pattern (singleton c)) s
                     then Result (Right c) (drop 1 str)
                     else let msg = "Expected one of "
                                 <> show s
@@ -648,7 +646,7 @@ char' x = Parser \ str ->
 
 string' :: String -> Parser String String
 string' s = Parser \ str ->
-  case indexOf s str of
+  case indexOf (Pattern s) str of
        Just 0 -> Result (Right s) (drop (length s) str)
        _ -> let msg = "Expecting "
                    <> show s
@@ -848,7 +846,7 @@ int = do
 number :: Parser String Number
 number = fail "Expected a number" |> do
   intPart <- integral
-  char '.'
+  _ <- char '.'
   fracPart <- manyChar digit
   pure $ readFloat $ intPart <> "." <> fracPart
     where

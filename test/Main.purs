@@ -1,11 +1,14 @@
 module Test.Main where
 
 import Prelude
-import Text.Parsing.Simple
-import Text.Parsing.Combinators (choice, bracket)
-import Control.Monad.Eff.Console (logShow)
-import Data.List (List)
 
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Console (CONSOLE, logShow)
+import Data.List (List)
+import Text.Parsing.Combinators (choice, bracket)
+import Text.Parsing.Simple (Parser, alphanum, char, fix, int, parse, sat, sepBy, someChar, space, string, whitespace, (<|))
+
+main :: Eff (console :: CONSOLE) Unit
 main = do
   logShow $ parse dateParser dateString
   logShow $ parse exprs testSexpr
@@ -50,10 +53,10 @@ dateString = "Jan 31, 2001"
 dateParser :: Parser String Date
 dateParser = do
   month <- parseMonth
-  space
+  _ <- space
   day <- int
-  char ','
-  space
+  _ <- char ','
+  _ <- space
   year <- int
   pure $ Date year month day
     where
@@ -112,7 +115,7 @@ skipsome p = do
 
 singleComment :: Parser String Unit
 singleComment = do
-  char ';'
+  _ <- char ';'
   skipmany $ sat (_ /= '\n')
 
 simplespace :: Parser String Unit

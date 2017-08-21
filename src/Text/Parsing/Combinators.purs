@@ -24,7 +24,7 @@ import Control.Apply ((<*), (*>))
 import Control.MonadPlus (class MonadPlus)
 
 -- | Choose the first successful element from a foldable container of parsers.
-choice :: forall f m a. (Plus m, Foldable f) => f (m a) -> m a
+choice :: forall f m a. Plus m => Foldable f => f (m a) -> m a
 choice = foldl alt empty
 
 -- | Attempt a parse, with a default value in case of failure.
@@ -69,7 +69,7 @@ atLeast n p = append <$> exactly n p <*> many p
 atMost :: forall m a. MonadPlus m => Int -> m a -> m (List a)
 atMost n p = go (exactly n p) n p where
   go acc 0 _ = acc
-  go acc n p = go (acc <|> exactly (n-1) p) (n - 1) p
+  go acc n' p' = go (acc <|> exactly (n'-1) p') (n' - 1) p'
 
 -- | Given a value to parse and a separating parser, put all the values it finds
 -- | into a `List`.

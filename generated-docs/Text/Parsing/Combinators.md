@@ -3,7 +3,7 @@
 #### `choice`
 
 ``` purescript
-choice :: forall f m a. (Plus m, Foldable f) => f (m a) -> m a
+choice :: forall f m a. Plus m => Foldable f => f (m a) -> m a
 ```
 
 Choose the first successful element from a foldable container of parsers.
