@@ -2,16 +2,21 @@ module Test.Main where
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, logShow)
+import Control.Alt ((<|>))
+import Control.Lazy (fix)
+import Effect (Effect)
+import Effect.Console (log)
+import Control.Monad.Transformerless.Except (Except(..))
 import Data.List (List)
-import Text.Parsing.Combinators (choice, bracket)
-import Text.Parsing.Simple (Parser, alphanum, char, fix, int, parse, sat, sepBy, someChar, space, string, whitespace, (<|))
+import Text.Parsing.Simple (Parser, alphaNum, bracket, char, choice, int, parse, satisfy, sepBy, skipMany, skipSome, someChar, space, string, whiteSpace)
 
-main :: Eff (console :: CONSOLE) Unit
+main :: Effect Unit
 main = do
-  logShow $ parse dateParser dateString
-  logShow $ parse exprs testSexpr
+  log $ showExcept $ parse dateParser dateString
+  log $ showExcept $ parse exprs testSexpr
+
+showExcept :: forall a b. Show a => Show b => Except a b -> String
+showExcept (Except e) = "(Except " <> show e <> ")"
 
 type Year = Int
 type Day = Int
@@ -104,43 +109,34 @@ instance showExpr :: Show Expr where
   show (List xs) = show xs
   show (Atom s) = s
 
-skipmany :: forall a. Parser String a -> Parser String Unit
-skipmany p = skipsome p <| pure unit
-
-skipsome :: forall a. Parser String a -> Parser String Unit
-skipsome p = do
-  x <- p
-  xs <- skipmany p
-  pure unit
-
 singleComment :: Parser String Unit
 singleComment = do
   _ <- char ';'
-  skipmany $ sat (_ /= '\n')
+  skipMany $ satisfy (_ /= '\n')
 
 simplespace :: Parser String Unit
-simplespace = skipsome $ sat \ c -> c == ' ' || c == '\n' || c == '\r' || c == '\t'
+simplespace = skipSome $ satisfy \ c -> c == ' ' || c == '\n' || c == '\r' || c == '\t'
 
 spaces :: Parser String Unit
-spaces = skipmany (simplespace <| singleComment)
+spaces = skipMany (simplespace <|> singleComment)
 
 parseLit :: Parser String Expr
 parseLit = Lit <$> int
 
 parseAtom :: Parser String Expr
-parseAtom = Atom <$> someChar alphanum
+parseAtom = Atom <$> someChar alphaNum
 
 parseList :: Parser String Expr -> Parser String Expr
-parseList p = List <$> p `sepBy` whitespace
+parseList p = List <$> p `sepBy` whiteSpace
 
 testSexpr :: String
 testSexpr = "(add (mul (div 2 (add 9 9)) (sub 9 99)) 18)"
 
 expr :: Parser String Expr
 expr = fix f where
-  f p = parseLit <| parseAtom <| bracket (char '(') (parseList p) (char ')')
+  f p = parseLit <|> parseAtom <|> bracket (char '(') (char ')') (parseList p)
 
 exprs :: Parser String (List Expr)
 exprs = do
   spaces
-  expr `sepBy` whitespace
+  expr `sepBy` whiteSpace
