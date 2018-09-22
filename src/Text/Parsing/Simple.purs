@@ -73,7 +73,7 @@ instance bindParser :: Bind (Parser i) where
 instance monadParser :: Monad (Parser i)
 
 instance lazyParser :: Lazy (Parser i o) where
-  defer f = Parser (defer (unwrap <<< f))
+  defer f = Parser (defer (\x -> unwrap $ f x))
 
 instance semigroupParser :: Semigroup o => Semigroup (Parser i o) where
   append = lift2 append
